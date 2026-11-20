@@ -1,19 +1,19 @@
-✔ [UPDATED FOR P3 TICKET-03: Contract v1.2 dawn_survived] headless CLI Night 1 fuel, refuel, drain, relight & dawn_survived win (81.7231ms)
-✔ [P2 regression] headless CLI Night 2 jump pad, charm, drifter, pause & fall scenario (68.7035ms)
-✔ headless CLI Night 3 determinism & full-night (18,000 ticks) performance <= 30s (549.3006ms)
-✔ headless CLI returns exit code 2 on invalid inputs/scenario (128.042ms)
-✔ [P4] Benchmark simulation spawns 200 wandering shades, 100 motes, L1-L3 lit fuel 100, and disables decay/damage/end (17.6398ms)
-✔ [P4] Leaderboard name validation, sorting, tie-break by earlier achieved_at, and top-10 cap (3.7234ms)
-✔ [P4] Soak test CLI runs consecutively with 0 crashes and bounded RSS (179.5061ms)
-✔ [P4] run_cmd --export-leaderboard exports sorted entries JSON (80.162ms)
-✔ game.contract.json v1.3 tuning & commands match src/sim/config.js (2.0329ms)
-✔ [P1/P2 regression] movement, cam_yaw_deg rotation, and normalization (3.1866ms)
-✔ [P1/P2 regression] mote pickup respects pickup_radius 1.0 and dynamic player.capacity (0.2965ms)
-✔ [UPDATED FOR P3 TICKET-03: replaced all_lit early win with dawn_survived & v1.2 scoring] lighting all lanterns continues until dawn_survived (0.4888ms)
-✔ [P3] fuel decay, lantern_out, relight cost 5 (+40 score), and refuel formula (3.3259ms)
-✔ [P3] low-fuel lantern (<30) loses safe zone, shade drains at <=2m, fuel_drain every 60 ticks, and pulse awards +15 (0.7955ms)
-✔ [P2 regression] dash, fall & respawn, drifter steal/drop, wind charm, and pause (0.4101ms)
-✔ [P4 fix] falling below island rim cannot snap back up through cliff when moving inward (0.5227ms)
+✔ [UPDATED FOR P3 TICKET-03: Contract v1.2 dawn_survived] headless CLI Night 1 fuel, refuel, drain, relight & dawn_survived win (89.5235ms)
+✔ [P2 regression] headless CLI Night 2 jump pad, charm, drifter, pause & fall scenario (103.7068ms)
+✔ headless CLI Night 3 determinism & full-night (18,000 ticks) performance <= 30s (544.6569ms)
+✔ headless CLI returns exit code 2 on invalid inputs/scenario (236.0959ms)
+✔ [P4] Benchmark simulation spawns 200 wandering shades, 100 motes, L1-L3 lit fuel 100, and disables decay/damage/end (19.751ms)
+✔ [P4] Leaderboard name validation, sorting, tie-break by earlier achieved_at, and top-10 cap (6.2318ms)
+✔ [P4] Soak test CLI runs consecutively with 0 crashes and bounded RSS (212.0026ms)
+✔ [P4] run_cmd --export-leaderboard exports sorted entries JSON (96.4812ms)
+✔ game.contract.json v1.3 tuning & commands match src/sim/config.js (1.6495ms)
+✔ [P1/P2 regression] movement, cam_yaw_deg rotation, and normalization (4.0602ms)
+✔ [P1/P2 regression] mote pickup respects pickup_radius 1.0 and dynamic player.capacity (0.2539ms)
+✔ [UPDATED FOR P3 TICKET-03: replaced all_lit early win with dawn_survived & v1.2 scoring] lighting all lanterns continues until dawn_survived (0.3296ms)
+✔ [P3] fuel decay, lantern_out, relight cost 5 (+40 score), and refuel formula (3.7455ms)
+✔ [P3] low-fuel lantern (<30) loses safe zone, shade drains at <=2m, fuel_drain every 60 ticks, and pulse awards +15 (1.0248ms)
+✔ [P2 regression] dash, fall & respawn, drifter steal/drop, wind charm, and pause (0.472ms)
+✔ [P4 fix] falling below island rim cannot snap back up through cliff when moving inward (0.5712ms)
 ℹ tests 16
 ℹ suites 0
 ℹ pass 16
@@ -21,4 +21,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 911.5472
+ℹ duration_ms 1079.1422

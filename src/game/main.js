@@ -215,6 +215,37 @@ const moonMesh = new THREE.Mesh(
 moonMesh.position.set(65, 78, -55);
 scene.add(moonMesh);
 
+// 3D Rising Dawn Sun & warm sunrise glow (shown in last 20s pre-dawn & full Bình Minh on win)
+const sunGroup = new THREE.Group();
+const sunCore = new THREE.Mesh(
+  new THREE.SphereGeometry(8.5, 28, 28),
+  new THREE.MeshBasicMaterial({ color: 0xfff3c4 })
+);
+const sunHalo = new THREE.Mesh(
+  new THREE.SphereGeometry(13.5, 24, 24),
+  new THREE.MeshBasicMaterial({ color: 0xff9d47, transparent: true, opacity: 0.32 })
+);
+sunGroup.add(sunCore, sunHalo);
+sunGroup.position.set(-70, -25, -95);
+sunGroup.visible = false;
+scene.add(sunGroup);
+
+const dawnLight = new THREE.DirectionalLight(0xffb86c, 0);
+dawnLight.position.set(-55, 26, -75);
+scene.add(dawnLight);
+
+const NIGHT_SKY_COLOR = new THREE.Color(PALETTE.sky);
+const NIGHT_FOG_COLOR = new THREE.Color(PALETTE.fog);
+const PREDAWN_SKY_COLOR = new THREE.Color(0x3b2c5c);
+const PREDAWN_FOG_COLOR = new THREE.Color(0x6e4a6e);
+const DAWN_SKY_COLOR = new THREE.Color(0xf49d6e);
+const DAWN_FOG_COLOR = new THREE.Color(0xf7c59f);
+const NIGHT_HEMI_SKY = new THREE.Color(0x748ce0);
+const DAWN_HEMI_SKY = new THREE.Color(0xffd29d);
+const tmpSkyColor = new THREE.Color();
+const tmpFogColor = new THREE.Color();
+const tmpHemiColor = new THREE.Color();
+
 // Cloud sea plane + 3D volumetric rolling cloud clusters below islands
 const cloudSea = new THREE.Mesh(
   new THREE.CircleGeometry(210, 48),
@@ -985,8 +1016,26 @@ let lastMouseY = 0;
 let lastCountdownSec = -1;
 let shadeSpawnAlertUntil = 0;
 let lastSpawnedShadeId = null;
+let isDawnActive = false;
+let dawnProgress = 0;
 const keys = new Set();
 let pauseKeyQueued = false;
+
+function resetNightAtmosphere() {
+  isDawnActive = false;
+  dawnProgress = 0;
+  scene.background.copy(NIGHT_SKY_COLOR);
+  scene.fog.color.copy(NIGHT_FOG_COLOR);
+  hemiLight.color.copy(NIGHT_HEMI_SKY);
+  hemiLight.intensity = 0.55;
+  dawnLight.intensity = 0;
+  moonLight.intensity = 0.95;
+  moonMesh.position.set(65, 78, -55);
+  moonMesh.visible = true;
+  sunGroup.visible = false;
+  sunGroup.position.set(-70, -25, -95);
+  if (resultScreen) resultScreen.classList.remove('dawn-mode');
+}
 
 function triggerCameraShake(amount) {
   if (settings.reduceMotion || BENCH_MODE) return;
@@ -1162,6 +1211,7 @@ function showNightIntro(night) {
 
 function startNight(night) {
   currentNight = night;
+  resetNightAtmosphere();
   clearDynamicVisuals();
   buildMapGeometry(night);
   const nightSeed = campaignSeed + (night - 1);
@@ -1283,6 +1333,7 @@ if (optLargeText) {
 document.getElementById('btn-next-night').onclick = () => showNightIntro(currentNight + 1);
 document.getElementById('btn-retry-night').onclick = () => startNight(currentNight);
 document.getElementById('btn-result-menu').onclick = () => {
+  resetNightAtmosphere();
   appMode = 'menu';
   hud.classList.remove('visible');
   showOverlay(menuScreen);
@@ -1473,21 +1524,26 @@ function handleEvents(events) {
 
         if (ev.data.result === 'won') {
           sfx.playWin();
+          isDawnActive = true;
+          dawnProgress = settings.reduceMotion ? 1 : 0.15;
+          resultScreen.classList.add('dawn-mode');
           totalCampaignScore += sim.score;
           nightsWon = Math.min(3, nightsWon + 1);
           if (currentNight < 3) {
-            titleEl.textContent = `${sim.map.name} — Hoàn Thành!`;
-            reasonEl.textContent = 'Đèn Lồng đã giữ vững ánh sáng tới bình minh. Bạn có thể lưu điểm ngay hoặc sang hòn đảo tiếp theo!';
+            titleEl.textContent = `🌅 Bình Minh — ${sim.map.name} Hoàn Thành!`;
+            reasonEl.textContent = 'Mặt trời đã ló rạng trên biển mây! Bạn có thể lưu điểm ngay hoặc sang hòn đảo tiếp theo.';
             scoreEl.textContent = `Điểm Đêm ${currentNight}: ${sim.score} · Tổng: ${totalCampaignScore}`;
             nextBtn.style.display = 'inline-block';
           } else {
-            titleEl.textContent = 'Bình Minh Trên Ba Hòn Đảo!';
+            titleEl.textContent = '🌅 Bình Minh Trên Ba Hòn Đảo!';
             reasonEl.textContent = 'Mây đã xua tan sương đen qua cả 3 Đêm. Bình minh ấm áp trở về với biển mây!';
             scoreEl.textContent = `Tổng điểm chiến dịch: ${totalCampaignScore}`;
             nextBtn.style.display = 'none';
           }
         } else {
           sfx.playLose();
+          isDawnActive = false;
+          resultScreen.classList.remove('dawn-mode');
           titleEl.textContent = 'Sương Đen Bao Phủ...';
           reasonEl.textContent =
             ev.data.reason === 'dawn'
@@ -1557,6 +1613,44 @@ function syncVisuals(nowSec) {
 
   const litCount = sim.lanterns.filter((l) => l.lit).length;
   ambientLight.intensity = 0.15 + 0.55 * (litCount / sim.lanterns.length);
+
+  // Dawn / Sunrise visual transition (last 20s pre-dawn glow + full golden Bình Minh on win)
+  if (!BENCH_MODE) {
+    if (isDawnActive) {
+      dawnProgress = settings.reduceMotion ? 1 : Math.min(1, dawnProgress + 0.012);
+      tmpSkyColor.copy(PREDAWN_SKY_COLOR).lerp(DAWN_SKY_COLOR, dawnProgress);
+      tmpFogColor.copy(PREDAWN_FOG_COLOR).lerp(DAWN_FOG_COLOR, dawnProgress);
+      tmpHemiColor.copy(NIGHT_HEMI_SKY).lerp(DAWN_HEMI_SKY, dawnProgress);
+      scene.background.copy(tmpSkyColor);
+      scene.fog.color.copy(tmpFogColor);
+      hemiLight.color.copy(tmpHemiColor);
+      hemiLight.intensity = 0.55 + dawnProgress * 0.55;
+      ambientLight.intensity = Math.max(ambientLight.intensity, 0.35 + dawnProgress * 0.45);
+      dawnLight.intensity = dawnProgress * 1.55;
+      moonLight.intensity = Math.max(0.15, 0.95 * (1 - dawnProgress));
+      moonMesh.position.y = 78 - dawnProgress * 98;
+      moonMesh.visible = moonMesh.position.y > -12;
+      sunGroup.visible = true;
+      sunGroup.position.set(
+        sim.player.pos[0] - 62,
+        -12 + dawnProgress * 44,
+        sim.player.pos[2] - 88
+      );
+    } else if (appMode === 'playing' && sim.timeLeftS <= 20) {
+      const pre = Math.max(0, Math.min(1, (20 - sim.timeLeftS) / 20));
+      tmpSkyColor.copy(NIGHT_SKY_COLOR).lerp(PREDAWN_SKY_COLOR, pre);
+      tmpFogColor.copy(NIGHT_FOG_COLOR).lerp(PREDAWN_FOG_COLOR, pre);
+      scene.background.copy(tmpSkyColor);
+      scene.fog.color.copy(tmpFogColor);
+      dawnLight.intensity = pre * 0.45;
+      sunGroup.visible = pre > 0.35;
+      sunGroup.position.set(
+        sim.player.pos[0] - 62,
+        -24 + pre * 14,
+        sim.player.pos[2] - 88
+      );
+    }
+  }
 
   // Player
   playerMesh.position.set(sim.player.pos[0], sim.player.pos[1], sim.player.pos[2]);
@@ -1834,27 +1928,38 @@ function syncVisuals(nowSec) {
   }
 
   // Spherical orbit camera follow (never clips through Mây on fast turns)
-  const desiredPivot = new THREE.Vector3(sim.player.pos[0], sim.player.pos[1] + 1.2, sim.player.pos[2]);
-  camPivot.lerp(desiredPivot, 0.25);
-  const yawRad = (camYawDeg * Math.PI) / 180;
-  const pitchRad = (camPitchDeg * Math.PI) / 180;
-  const horizDist = camDist * Math.cos(pitchRad);
-  const vertDist = camDist * Math.sin(pitchRad);
-  let shakeX = 0;
-  let shakeY = 0;
-  if (cameraShake > 0.005 && !settings.reduceMotion) {
-    shakeX = (Math.random() - 0.5) * cameraShake;
-    shakeY = (Math.random() - 0.5) * cameraShake;
-    cameraShake *= 0.85;
+  if (isDawnActive && appMode === 'result') {
+    const desiredPivot = new THREE.Vector3(sim.player.pos[0], sim.player.pos[1] + 2.2, sim.player.pos[2]);
+    camPivot.lerp(desiredPivot, 0.12);
+    // Frame the island looking toward the rising sun at (-62, Y, -88)
+    camera.position.lerp(
+      new THREE.Vector3(sim.player.pos[0] + 12, sim.player.pos[1] + 5.5, sim.player.pos[2] + 16),
+      settings.reduceMotion ? 1 : 0.05
+    );
+    camera.lookAt(camPivot.x - 10, camPivot.y + 4, camPivot.z - 16);
   } else {
-    cameraShake = 0;
+    const desiredPivot = new THREE.Vector3(sim.player.pos[0], sim.player.pos[1] + 1.2, sim.player.pos[2]);
+    camPivot.lerp(desiredPivot, 0.25);
+    const yawRad = (camYawDeg * Math.PI) / 180;
+    const pitchRad = (camPitchDeg * Math.PI) / 180;
+    const horizDist = camDist * Math.cos(pitchRad);
+    const vertDist = camDist * Math.sin(pitchRad);
+    let shakeX = 0;
+    let shakeY = 0;
+    if (cameraShake > 0.005 && !settings.reduceMotion) {
+      shakeX = (Math.random() - 0.5) * cameraShake;
+      shakeY = (Math.random() - 0.5) * cameraShake;
+      cameraShake *= 0.85;
+    } else {
+      cameraShake = 0;
+    }
+    camera.position.set(
+      camPivot.x - Math.sin(yawRad) * horizDist + shakeX,
+      camPivot.y + vertDist + shakeY,
+      camPivot.z - Math.cos(yawRad) * horizDist
+    );
+    camera.lookAt(camPivot);
   }
-  camera.position.set(
-    camPivot.x - Math.sin(yawRad) * horizDist + shakeX,
-    camPivot.y + vertDist + shakeY,
-    camPivot.z - Math.cos(yawRad) * horizDist
-  );
-  camera.lookAt(camPivot);
 
   // HUD
   hudFlames.textContent = '🔥'.repeat(sim.player.flames) + '🖤'.repeat(Math.max(0, TUNING.flames - sim.player.flames));
