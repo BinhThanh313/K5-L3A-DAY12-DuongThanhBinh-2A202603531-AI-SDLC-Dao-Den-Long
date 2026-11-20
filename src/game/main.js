@@ -225,13 +225,17 @@ function createPlayerMesh() {
   body.castShadow = true;
   group.add(body);
 
-  const scarf = new THREE.Mesh(
-    new THREE.TorusGeometry(0.24, 0.08, 8, 16),
-    new THREE.MeshStandardMaterial({ color: PALETTE.mayScarf, roughness: 0.6 })
-  );
+  const scarfMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.mayScarf,
+    emissive: PALETTE.mayScarf,
+    emissiveIntensity: 0,
+    roughness: 0.5
+  });
+  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.08, 8, 16), scarfMat);
   scarf.rotation.x = Math.PI / 2;
   scarf.position.y = 1.1;
   group.add(scarf);
+  group.userData.scarfMat = scarfMat;
 
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.24, 14, 12),
@@ -269,6 +273,78 @@ function createPlayerMesh() {
   arrow.rotation.x = Math.PI / 2;
   arrow.position.set(0, 0.08, 0.85);
   group.add(arrow);
+
+  // Wind Charm (Bùa Gió) speed-boost aura around Mây
+  const charmAura = new THREE.Group();
+  const ringRed = new THREE.Mesh(
+    new THREE.TorusGeometry(0.78, 0.035, 8, 28),
+    new THREE.MeshBasicMaterial({ color: PALETTE.mayScarf, transparent: true, opacity: 0.85 })
+  );
+  ringRed.rotation.x = Math.PI / 2.3;
+  ringRed.position.y = 0.85;
+  charmAura.add(ringRed);
+
+  const ringGold = new THREE.Mesh(
+    new THREE.TorusGeometry(0.92, 0.03, 8, 28),
+    new THREE.MeshBasicMaterial({ color: PALETTE.gold, transparent: true, opacity: 0.85 })
+  );
+  ringGold.rotation.x = -Math.PI / 2.5;
+  ringGold.position.y = 0.95;
+  charmAura.add(ringGold);
+
+  const groundVortex = new THREE.Mesh(
+    new THREE.RingGeometry(0.55, 1.05, 32),
+    new THREE.MeshBasicMaterial({
+      color: PALETTE.gold,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide
+    })
+  );
+  groundVortex.rotation.x = -Math.PI / 2;
+  groundVortex.position.y = 0.05;
+  charmAura.add(groundVortex);
+
+  // 3 orbiting mini Wind Charm talismans
+  const orbitGroup = new THREE.Group();
+  orbitGroup.position.y = 1.0;
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    const talisman = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.28, 0.04),
+      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? PALETTE.mayScarf : PALETTE.gold })
+    );
+    talisman.position.set(Math.cos(a) * 0.85, 0, Math.sin(a) * 0.85);
+    orbitGroup.add(talisman);
+  }
+  charmAura.add(orbitGroup);
+  charmAura.visible = false;
+  group.add(charmAura);
+
+  // Speed trail streaks when dashing or running with Wind Charm
+  const dashTrail = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const streak = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.04, 1.35, 6),
+      new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? PALETTE.gold : 0xffffff,
+        transparent: true,
+        opacity: 0.65
+      })
+    );
+    streak.rotation.x = Math.PI / 2;
+    streak.position.set((i - 1.5) * 0.28, 0.45 + (i % 2) * 0.45, -0.85 - (i % 2) * 0.25);
+    dashTrail.add(streak);
+  }
+  dashTrail.visible = false;
+  group.add(dashTrail);
+
+  group.userData.charmAura = charmAura;
+  group.userData.ringRed = ringRed;
+  group.userData.ringGold = ringGold;
+  group.userData.orbitGroup = orbitGroup;
+  group.userData.groundVortex = groundVortex;
+  group.userData.dashTrail = dashTrail;
 
   return group;
 }
@@ -786,6 +862,21 @@ function syncVisuals(nowSec) {
   playerMesh.visible =
     sim.player.fallRespawnTicks === 0 &&
     (sim.player.invulnTicks === 0 || Math.floor(nowSec * 14) % 2 === 0);
+
+  // Wind Charm (Bùa Gió) aura & speed trail animation on Mây
+  const hasCharm = sim.player.charmTicks > 0;
+  const isMoving = Math.hypot(sim.player.vel[0], sim.player.vel[2]) > 0.5;
+  playerMesh.userData.charmAura.visible = hasCharm;
+  playerMesh.userData.scarfMat.emissiveIntensity = hasCharm ? 1.1 + Math.sin(nowSec * 10) * 0.3 : 0;
+  if (hasCharm) {
+    playerMesh.userData.ringRed.rotation.z = nowSec * 6.5;
+    playerMesh.userData.ringGold.rotation.z = -nowSec * 5.2;
+    playerMesh.userData.orbitGroup.rotation.y = nowSec * 5.5;
+    playerMesh.userData.orbitGroup.position.y = 0.95 + Math.sin(nowSec * 6) * 0.12;
+    const pulseScale = 1 + Math.sin(nowSec * 8) * 0.12;
+    playerMesh.userData.groundVortex.scale.set(pulseScale, pulseScale, 1);
+  }
+  playerMesh.userData.dashTrail.visible = sim.player.dashTicks > 0 || (hasCharm && isMoving);
 
   // Pulse wave
   if (pulseWaveAnim > 0) {
