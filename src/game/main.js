@@ -135,46 +135,70 @@ function buildMapGeometry(night) {
     worldGroup.add(bridge);
   } else if (night === 3) {
     addIslandDisk(0, 0, 45, 0, 3.2);
-    // Tier 1 ring (r=12..24, z>0, Y=3) approximated with arc segments
-    const tier1Geo = new THREE.RingGeometry(12, 24, 32, 1, 0, Math.PI);
-    const tier1Mesh = new THREE.Mesh(
-      tier1Geo,
-      new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 0.9, side: THREE.DoubleSide })
-    );
-    tier1Mesh.rotation.x = Math.PI / 2;
-    tier1Mesh.position.y = 3.0;
-    worldGroup.add(tier1Mesh);
 
-    // Tier 1 solid wall support visual
-    const tier1Wall = new THREE.Mesh(
-      new THREE.CylinderGeometry(24, 24, 3.0, 32, 1, true, 0, Math.PI),
-      sandMat
-    );
-    tier1Wall.rotation.y = Math.PI / 2;
-    tier1Wall.position.y = 1.5;
-    worldGroup.add(tier1Wall);
+    // Tier 1: exact solid semicircular ring (r=12..24, z>0, Y=0..3) matching maps.js 100%
+    const t1Shape = new THREE.Shape();
+    t1Shape.moveTo(24, 0);
+    t1Shape.absarc(0, 0, 24, 0, Math.PI, false);
+    t1Shape.lineTo(-12, 0);
+    t1Shape.absarc(0, 0, 12, Math.PI, 0, true);
+    t1Shape.closePath();
 
-    // Tier 2 disk (r=8, Y=6)
-    addIslandDisk(0, 0, 8, 6.0, 6.0);
+    const t1Geo = new THREE.ExtrudeGeometry(t1Shape, { depth: 3.0, bevelEnabled: false, curveSegments: 36 });
+    const t1Mesh = new THREE.Mesh(t1Geo, [grassMat, sandMat]);
+    t1Mesh.rotation.x = Math.PI / 2;
+    t1Mesh.position.y = 3.0;
+    t1Mesh.receiveShadow = true;
+    t1Mesh.castShadow = true;
+    worldGroup.add(t1Mesh);
 
-    // Bell Tower (r=2, h=8) on Tier 2
+    // Tier 2: elevated circular deck (r=8, Y=5.3..6.0) with 4 slender support pillars so spawn (0,0,0) is open
+    addIslandDisk(0, 0, 8, 6.0, 0.8);
+    for (const deg of [45, 135, 225, 315]) {
+      const rad = (deg * Math.PI) / 180;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 5.4, 10), woodMat);
+      col.position.set(Math.cos(rad) * 7.0, 2.7, Math.sin(rad) * 7.0);
+      worldGroup.add(col);
+    }
+
+    // Bell Tower (r=2, h=8) on Tier 2 (Y=6..14)
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 8.0, 20), woodMat);
     tower.position.set(0, 10.0, 0);
     worldGroup.add(tower);
-    const bellRoof = new THREE.Mesh(new THREE.ConeGeometry(2.8, 2.2, 8), new THREE.MeshStandardMaterial({ color: PALETTE.gold }));
+    const bellRoof = new THREE.Mesh(
+      new THREE.ConeGeometry(2.8, 2.2, 8),
+      new THREE.MeshStandardMaterial({ color: PALETTE.gold, emissive: PALETTE.lanternLit, emissiveIntensity: 0.25 })
+    );
     bellRoof.position.set(0, 15.0, 0);
     worldGroup.add(bellRoof);
 
-    // 2 Ramps at 30 deg & 150 deg (from r=30 Y=0 to r=24 Y=3, width 3)
+    // 2 Ramps at 30 deg & 150 deg (from r=30 Y=0 to r=24 Y=3, width 3) with exact YXZ rotation + glowing guide rails
+    const railMat = new THREE.MeshStandardMaterial({
+      color: PALETTE.gold,
+      emissive: PALETTE.lanternLit,
+      emissiveIntensity: 0.65
+    });
     for (const deg of [30, 150]) {
       const rad = (deg * Math.PI) / 180;
       const rampLen = Math.hypot(6, 3);
-      const ramp = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.3, 3.0), woodMat);
+      const rampGroup = new THREE.Group();
       const midR = 27;
-      ramp.position.set(Math.cos(rad) * midR, 1.4, Math.sin(rad) * midR);
-      ramp.rotation.y = -rad;
-      ramp.rotation.z = -Math.atan2(3, 6);
-      worldGroup.add(ramp);
+      rampGroup.position.set(Math.cos(rad) * midR, 1.5, Math.sin(rad) * midR);
+      rampGroup.rotation.order = 'YXZ';
+      rampGroup.rotation.y = -rad;
+      rampGroup.rotation.z = -Math.atan2(3, 6);
+
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.26, 3.0), woodMat);
+      deck.position.y = -0.13;
+      deck.receiveShadow = true;
+      rampGroup.add(deck);
+
+      for (const side of [-1.45, 1.45]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.14, 0.14), railMat);
+        rail.position.set(0, 0.25, side);
+        rampGroup.add(rail);
+      }
+      worldGroup.add(rampGroup);
     }
   }
 
@@ -236,6 +260,16 @@ function createPlayerMesh() {
   charmPivot.add(pLight);
   group.add(charmPivot);
   group.userData.charmPivot = charmPivot;
+
+  // Forward direction ground chevron so player always sees exact facing/dash direction
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.22, 0.45, 3),
+    new THREE.MeshBasicMaterial({ color: PALETTE.gold, transparent: true, opacity: 0.75 })
+  );
+  arrow.rotation.x = Math.PI / 2;
+  arrow.position.set(0, 0.08, 0.85);
+  group.add(arrow);
+
   return group;
 }
 

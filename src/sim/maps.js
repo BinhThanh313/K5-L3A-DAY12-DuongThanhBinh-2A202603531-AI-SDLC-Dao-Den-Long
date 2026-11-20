@@ -217,28 +217,37 @@ export function resolveHorizontalCollision(map, oldX, oldZ, newX, newZ, currentY
       }
     }
 
-    // Check vertical cliff walls (Tier 1 & Tier 2)
-    const oldR = Math.hypot(oldX, oldZ);
-    const newR = Math.hypot(x, z);
+    // Tier 1 vertical cliff wall (12 <= r <= 24, z > 0, Y=3) when below Tier 1 and NOT on a ramp
+    const inTier1XZ = (px, pz) => {
+      const r = Math.hypot(px, pz);
+      return r >= 12.0 && r <= 24.0 && pz > 0;
+    };
+    const onRamp =
+      getRampHeight(map.ramps, x, z) !== null || getRampHeight(map.ramps, oldX, oldZ) !== null;
 
-    // Entering Tier 2 disk (r <= 8, Y=6) from below (currentY < 5.35)
-    if (currentY < 5.35 && newR <= 8.0 && oldR > 8.0) {
-      const nx = newR > 1e-6 ? x / newR : 1;
-      const nz = newR > 1e-6 ? z / newR : 0;
-      x = nx * 8.01;
-      z = nz * 8.01;
+    if (!onRamp && currentY < 2.35 && inTier1XZ(x, z) && !inTier1XZ(oldX, oldZ)) {
       blocked = true;
-    }
-
-    // Entering Tier 1 ring (12 <= r <= 24, z > 0, Y=3) from below (currentY < 2.35) when NOT on a ramp
-    const onRamp = getRampHeight(map.ramps, x, z) !== null || getRampHeight(map.ramps, oldX, oldZ) !== null;
-    if (!onRamp && currentY < 2.35) {
-      const wasInTier1 = oldR >= 12.0 && oldR <= 24.0 && oldZ > 0;
-      const nowInTier1 = newR >= 12.0 && newR <= 24.0 && z > 0;
-      if (nowInTier1 && !wasInTier1) {
-        x = oldX;
+      // Slide smoothly along the cliff instead of freezing dead
+      if (!inTier1XZ(x, oldZ)) {
         z = oldZ;
-        blocked = true;
+      } else if (!inTier1XZ(oldX, z)) {
+        x = oldX;
+      } else {
+        const oldR = Math.hypot(oldX, oldZ);
+        if (oldZ <= 0) {
+          z = -0.02;
+        } else if (oldR > 24.0) {
+          const r = Math.hypot(x, z) || 1;
+          x = (x / r) * 24.02;
+          z = (z / r) * 24.02;
+        } else if (oldR < 12.0) {
+          const r = Math.hypot(x, z) || 1;
+          x = (x / r) * 11.98;
+          z = (z / r) * 11.98;
+        } else {
+          x = oldX;
+          z = oldZ;
+        }
       }
     }
   }
