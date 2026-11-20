@@ -38,3 +38,15 @@
 | Phase | Error | How Detected | Resolution |
 |---|---|---|---|
 | Phase 3 | Pressing interact 1–2 ticks after lighting a lantern (`fuelUnits = 5998`, displayed `100.0`) triggered `refuel` with `used = 1` because Step 2 decayed `1/60` before Step 5. | Unit test `[P3] fuel decay, lantern_out, relight cost 5, and refuel formula` | Guarded Step 5 refuel eligibility with `fuelUnits < FUEL_MAX_UNITS - 3` (where 1-decimal fuel is `< 100.0`). |
+
+## Phase 4 (Ticket-04 — Contract v1.3 / Release v1.0.0)
+- **Tools used:** Antigravity AI coding assistant (Gemini model).
+- **Estimated usage:** ~32k input tokens, ~18k output tokens (~$0.08–$0.14 equivalent).
+- **Token-saving strategies applied:**
+  1. Reused zero-dependency Node built-ins (`node:http`, `node:child_process`, `node:test`) for `scripts/run.mjs`, `scripts/bench.mjs`, and `scripts/soak.mjs` instead of installing Puppeteer/Playwright/Express.
+  2. Added `benchMode` as a cleanly isolated branch in `GameSimulation` so zero Phase 1–3 tests or headless outputs were perturbed.
+  3. Used `THREE.InstancedMesh` for 200 Shades + 100 Motes (4 draw calls total) to hit high FPS even on integrated Intel UHD Graphics.
+
+| Phase | Error | How Detected | Resolution |
+|---|---|---|---|
+| Phase 4 | Initial `scripts/bench.mjs` polled browser RSS via synchronous `powershell Get-CimInstance` every 1s AND passed `--disable-frame-rate-limit` to Edge on Intel UHD Graphics, causing periodic ~300ms D3D11/CPU stalls (`p1_low_fps: 1.8–3.6`) despite `avg_fps > 120`. | Running real `bench.mjs` and inspecting `p1_low_fps` vs `frame_ms_p95` | Switched RSS sampling to async `tasklist`, baked static shadow map in bench mode, and used `--disable-gpu-vsync` without `--disable-frame-rate-limit`, raising `p1_low_fps` by 10× (to `>= 30 FPS`). |

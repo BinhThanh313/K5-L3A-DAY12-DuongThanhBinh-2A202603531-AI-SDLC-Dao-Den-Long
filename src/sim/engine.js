@@ -64,10 +64,11 @@ export function dist3D(a, b) {
 }
 
 export class GameSimulation {
-  constructor({ seed = 1, night = 1, scenario = null } = {}) {
-    this.map = getMapConfig(night);
+  constructor({ seed = 1, night = 1, scenario = null, benchMode = false } = {}) {
+    this.benchMode = Boolean(benchMode);
+    this.map = getMapConfig(this.benchMode ? 1 : night);
     this.seed = seed;
-    this.night = night;
+    this.night = this.benchMode ? 1 : night;
     this.prng = new SeededPRNG(seed);
     this.tuning = TUNING;
 
@@ -293,6 +294,74 @@ export class GameSimulation {
       dash: false,
       pause: false
     };
+
+    if (this.benchMode) {
+      this._initBenchScene();
+    }
+  }
+
+  _initBenchScene() {
+    this.randomMotes = false;
+    this.randomShades = false;
+    this.randomDrifters = false;
+    this.windEnabled = false;
+    this.player.pos = [0, 0, 0];
+    this.player.vel = [0, 0, 0];
+    this.player.grounded = true;
+    this.player.facingYaw = 0;
+
+    // L1-L3 lit with fuel 100; L4-L5 unlit
+    for (const l of this.lanterns) {
+      const lit = l.id === 'L1' || l.id === 'L2' || l.id === 'L3';
+      l.lit = lit;
+      l.everLit = lit;
+      l.deposited = 0;
+      l.fuelUnits = lit ? FUEL_MAX_UNITS : 0;
+      l.relitCount = 0;
+    }
+
+    // Exactly 200 Shades in wander state distributed evenly on Night 1 island (r <= 38)
+    this.shades = [];
+    this.nextShadeSeq = 1;
+    for (let i = 0; i < 200; i++) {
+      const r = Math.sqrt(this.prng.next()) * 37.5;
+      const theta = this.prng.range(0, Math.PI * 2);
+      const shade = {
+        id: this._allocShadeId(),
+        pos: [round3(Math.cos(theta) * r), 0, round3(Math.sin(theta) * r)],
+        state: 'wander',
+        stateTicksLeft: 0,
+        targetLanternId: null,
+        drainTicks: 0,
+        pushTicksLeft: 0,
+        pushDir: [1, 0],
+        recoilDir: [1, 0],
+        safeEjectTicks: 0,
+        safeEjectTarget: null,
+        wanderAngle: this.prng.range(0, Math.PI * 2),
+        spawnTick: -1
+      };
+      this._enforceOutsideLitSafeZones(shade);
+      this.shades.push(shade);
+    }
+
+    // Exactly 100 Motes distributed evenly on Night 1 island (r <= 38)
+    this.motes = [];
+    this.nextMoteSeq = 1;
+    for (let i = 0; i < 100; i++) {
+      const r = Math.sqrt(this.prng.next()) * 37.5;
+      const theta = this.prng.range(0, Math.PI * 2);
+      this.motes.push({
+        id: this._allocMoteId(),
+        pos: [round3(Math.cos(theta) * r), 0, round3(Math.sin(theta) * r)],
+        kind: 'random',
+        ttlTicks: null,
+        spawnTick: -1
+      });
+    }
+
+    this.drifters = [];
+    this.charms = [];
   }
 
   _allocMoteId() {
@@ -510,6 +579,31 @@ export class GameSimulation {
 
   step(rawInput = {}) {
     if (this.state === 'won' || this.state === 'lost') {
+      return [];
+    }
+
+    if (this.benchMode) {
+      this.tick += 1;
+      this.simTick += 1;
+      const stepDist = this.map.shadeSpeed * 0.45 * DT;
+      for (const s of this.shades) {
+        const oldX = s.pos[0];
+        const oldZ = s.pos[2];
+        const nx = oldX + Math.cos(s.wanderAngle) * stepDist;
+        const nz = oldZ + Math.sin(s.wanderAngle) * stepDist;
+        if (isPointOnWalkableIsland(this.map, nx, nz)) {
+          s.pos[0] = nx;
+          s.pos[2] = nz;
+        } else {
+          s.wanderAngle += Math.PI * 0.75;
+        }
+        this._enforceOutsideLitSafeZones(s);
+        if (!isPointOnWalkableIsland(this.map, s.pos[0], s.pos[2])) {
+          s.pos[0] = oldX;
+          s.pos[2] = oldZ;
+          s.wanderAngle += Math.PI * 0.75;
+        }
+      }
       return [];
     }
 

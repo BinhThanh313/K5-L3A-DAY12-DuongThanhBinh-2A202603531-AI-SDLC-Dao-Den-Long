@@ -4,9 +4,12 @@ import fs from 'node:fs';
 import { GameSimulation, distXZ } from '../src/sim/engine.js';
 import { CHARM_SPEED, TUNING } from '../src/sim/config.js';
 
-test('game.contract.json v1.2 tuning matches src/sim/config.js', () => {
+test('game.contract.json v1.3 tuning & commands match src/sim/config.js', () => {
   const contract = JSON.parse(fs.readFileSync(new URL('../game.contract.json', import.meta.url), 'utf8'));
-  assert.equal(contract.contract_version, '1.2');
+  assert.equal(contract.contract_version, '1.3');
+  assert.equal(typeof contract.run_cmd, 'string');
+  assert.equal(typeof contract.bench_cmd, 'string');
+  assert.equal(typeof contract.soak_cmd, 'string');
   assert.deepEqual(contract.tuning, TUNING);
 });
 

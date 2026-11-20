@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [1.0.0 — Phase 4 / Contract v1.3] - 2026-11-20 (Ticket-04: "Bình minh: phát hành v1.0.0")
+
+### Added
+- **Benchmark Mode (`bench_cmd`):** `node scripts/bench.mjs --seed 42 --duration 30 --out bench.json` launches a non-fullscreen `1280×720` window with vsync disabled (`--disable-frame-rate-limit --disable-gpu-vsync`), loads standard Night 1 lighting & shadows with 200 wandering Shades and 100 Motes rendered via `THREE.InstancedMesh`, L1–L3 lit at `fuel = 100`, Mây stationary at `(0,0,0)`, orbiting camera (`r = 30 m, Y = 15 m`, CCW from `(30,15,0)`, `15 s/rev`), 3 s warmup + `--duration` measurement, and outputs Contract v1.3 `bench.json`.
+- **Soak Test (`soak_cmd`):** `node scripts/soak.mjs --seed 7 --nights 10 --out soak.json` runs 10 consecutive headless nights (rotating Nights 1→2→3) in a single Node process with seeded random inputs, verifying `crashes = 0` and bounded RSS (`mem_end_mb <= 1.2 * mem_start_mb`).
+- **Local Disk Leaderboard:** `src/sim/leaderboard.js` + `scripts/run.mjs` persist top-10 scores to `data/leaderboard.json` (accessible from Main Menu and Result screen after Dawn Victory or defeat; supports 3–12 char `[A-Za-z0-9_]` + Vietnamese accented letters; sorted by score desc, earlier `achieved_at` tie-break). Export via `node scripts/run.mjs --export-leaderboard out.json`.
+- **Accessibility Suite:**
+  - Full key remapping for all 9 actions (`moveUp`, `moveDown`, `moveLeft`, `moveRight`, `jump`, `dash`, `interact`, `pulse`, `pause`) with duplicate-key conflict warning and "Khôi phục mặc định".
+  - Visual subtitles & indicators for Shade spawn (with directional edge arrow), Wind warning, last 10 seconds, and low-fuel lanterns (`fuel < 30`).
+  - Reduce Motion mode ("Giảm chuyển động") disabling camera shake, hit screen-flash, and blinking CSS animations.
+  - Minimum `18 px` UI font size at `1280×720` plus Large Text (`×1.25`) toggle.
+- **Test Contract v1.3:** Updated `game.contract.json` (`contract_version: "1.3"`, `run_cmd`, `bench_cmd`, `soak_cmd`), added `tests/phase4.test.js`, and updated `scripts/verify-phase.mjs` for Phase 4 proof.
+- **Release & Retrospective:** Updated `README.md`, `CREDITS.md`, `docs/notes/phase-4-eval.md`, and `docs/notes/retro.md`.
+
 ## [Phase 3 — Contract v1.2] - 2026-11-20 (Ticket-03: "Đèn cạn dầu")
 
 ### Breaking Changes (Replaced Rules from Phase 1 & Phase 2)

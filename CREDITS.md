@@ -12,4 +12,5 @@
 - All sound effects (pentatonic chimes, lantern ignition chord, pulse wave, hit thud) are procedurally synthesized via Web Audio API in `src/game/audio.js`. No external copyrighted audio or 3D models were used.
 
 ## AI Tools Used
-- Antigravity AI coding assistant (used for planning, code generation, test authoring, and verification orchestration).
+- Antigravity AI coding assistant (Gemini model) — used for architecture planning, code generation, Three.js procedural geometry, Web Audio API synthesis, automated test authoring, benchmark/soak harness, and documentation.
+- All generated code, tests, benchmark results, and soak test runs were verified directly by automated test suites and manual review.
