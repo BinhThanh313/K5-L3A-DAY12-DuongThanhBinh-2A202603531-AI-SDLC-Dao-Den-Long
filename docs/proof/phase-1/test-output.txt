@@ -1,0 +1,19 @@
+✔ headless CLI runs full win scenario and matches Test Contract v1.0 JSONL schema (65.4978ms)
+✔ headless CLI determinism: two runs with same seed & inputs produce byte-identical JSONL (131.4339ms)
+✔ headless CLI returns exit code 2 on invalid inputs (non-increasing ticks, malformed JSON) (98.7127ms)
+✔ game.contract.json tuning matches src/sim/config.js (2.0359ms)
+✔ movement, cam_yaw_deg rotation, and vector normalization (1.9762ms)
+✔ mote pickup respects pickup_radius and carry_capacity (0.3863ms)
+✔ deposit lights final lantern and triggers win with bonuses (0.2798ms)
+✔ pulse stuns and pushes shades, costs motes, and respects cooldown (0.4529ms)
+✔ lit lantern safe_radius keeps shades out (1.1106ms)
+✔ shade hit damages player, drops motes, grants invuln, and triggers no_flames loss (0.6793ms)
+✔ dawn timeout triggers lost with reason dawn (0.3614ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 374.3581
