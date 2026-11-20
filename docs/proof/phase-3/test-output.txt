@@ -1,0 +1,19 @@
+✔ [UPDATED FOR P3 TICKET-03: Contract v1.2 dawn_survived] headless CLI Night 1 fuel, refuel, drain, relight & dawn_survived win (69.6251ms)
+✔ [P2 regression] headless CLI Night 2 jump pad, charm, drifter, pause & fall scenario (64.1647ms)
+✔ headless CLI Night 3 determinism & full-night (18,000 ticks) performance <= 30s (383.0206ms)
+✔ headless CLI returns exit code 2 on invalid inputs/scenario (98.076ms)
+✔ game.contract.json v1.2 tuning matches src/sim/config.js (1.3568ms)
+✔ [P1/P2 regression] movement, cam_yaw_deg rotation, and normalization (3.0826ms)
+✔ [P1/P2 regression] mote pickup respects pickup_radius 1.0 and dynamic player.capacity (0.2536ms)
+✔ [UPDATED FOR P3 TICKET-03: replaced all_lit early win with dawn_survived & v1.2 scoring] lighting all lanterns continues until dawn_survived (0.3056ms)
+✔ [P3] fuel decay, lantern_out, relight cost 5 (+40 score), and refuel formula (3.1122ms)
+✔ [P3] low-fuel lantern (<30) loses safe zone, shade drains at <=2m, fuel_drain every 60 ticks, and pulse awards +15 (0.9873ms)
+✔ [P2 regression] dash, fall & respawn, drifter steal/drop, wind charm, and pause (0.4756ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 685.2927

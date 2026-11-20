@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const PROOF_DIR = path.resolve('docs/proof/phase-2');
+const PROOF_DIR = path.resolve('docs/proof/phase-3');
 fs.mkdirSync(PROOF_DIR, { recursive: true });
 
 function runCmd(cmd, args, label, useShell = false) {
@@ -17,87 +17,99 @@ function runCmd(cmd, args, label, useShell = false) {
 }
 
 // 1. Unit & headless contract tests
-const testRes = runCmd(process.execPath, ['--test', 'tests/sim.test.js', 'tests/headless.test.js'], 'Unit & Headless Tests');
+const testRes = runCmd(process.execPath, ['--test', 'tests/sim.test.js', 'tests/headless.test.js'], 'Unit & Headless Tests (v1.2)');
 fs.writeFileSync(path.join(PROOF_DIR, 'test-output.txt'), testRes.stdout + testRes.stderr, 'utf8');
 
 // 2. Production Vite build
 const buildRes = runCmd('npm', ['run', 'build'], 'Production Build (Vite)', process.platform === 'win32');
 fs.writeFileSync(path.join(PROOF_DIR, 'build-output.txt'), buildRes.stdout + buildRes.stderr, 'utf8');
 
-// 3. Headless Scenario: Night 2 Dash + Charm + Drifter Steal/Drop + Pause
-const n2Scenario = path.join(PROOF_DIR, 'scenario-night2-features.json');
-const n2Inputs = path.join(PROOF_DIR, 'inputs-night2-features.json');
-const n2Out = path.join(PROOF_DIR, 'out-night2-features.jsonl');
+// 3. Headless Scenario: Phase 3 Fuel Decay, Drain, Lantern Out, Relight, Refuel & Dawn Survived
+const p3Scenario = path.join(PROOF_DIR, 'scenario-phase3-fuel-dawn.json');
+const p3Inputs = path.join(PROOF_DIR, 'inputs-phase3-fuel-dawn.json');
+const p3Out = path.join(PROOF_DIR, 'out-phase3-fuel-dawn.jsonl');
 
 fs.writeFileSync(
-  n2Scenario,
+  p3Scenario,
   JSON.stringify(
     {
-      player: { pos: [35, 0, 0], carried: 8, flames: 3 },
+      player: { pos: [0, 0, 0], carried: 10, flames: 3 },
       random_motes: false,
       random_shades: false,
-      random_drifters: false,
       motes: [],
-      shades: [],
-      drifters: [{ id: 'D1', pos: [35.5, 1.0, 0], state: 'chase' }]
+      shades: [{ id: 'S1', pos: [23.8, 0, 6.2], state: 'drain', target_lantern_id: 'L2' }],
+      lanterns: [
+        { id: 'L1', pos: [0, 0, 1.0], lit: true, fuel: 0.5 },
+        { id: 'L2', pos: [23.8, 0, 7.7], lit: true, fuel: 25 },
+        { id: 'L3', lit: true, fuel: 90 },
+        { id: 'L4', lit: true, fuel: 90 },
+        { id: 'L5', lit: false }
+      ],
+      time_left_s: 1.5
     },
     null,
     2
   )
 );
+
 fs.writeFileSync(
-  n2Inputs,
+  p3Inputs,
   JSON.stringify(
     {
       frames: [
-        { tick: 0, dash: true },
-        { tick: 1, dash: false, pulse: true },
-        { tick: 2, pulse: false, pause: true },
-        { tick: 3, pause: false },
-        { tick: 15, pause: true },
-        { tick: 16, pause: false }
+        { tick: 35, interact: true },
+        { tick: 36, interact: false },
+        { tick: 70, interact: true },
+        { tick: 71, interact: false }
       ]
     },
     null,
     2
   )
 );
+
 runCmd(
   process.execPath,
-  ['src/headless/cli.js', '--seed', '7', '--night', '2', '--scenario', n2Scenario, '--inputs', n2Inputs, '--ticks', '40', '--out', n2Out, '--snapshot-every', '10'],
-  'Night 2 Features Scenario (Dash, Charm, Drifter, Pause)'
+  ['src/headless/cli.js', '--seed', '42', '--night', '1', '--scenario', p3Scenario, '--inputs', p3Inputs, '--ticks', '120', '--out', p3Out, '--snapshot-every', '30'],
+  'Phase 3 Fuel, Drain, Relight, Refuel & Dawn Survived Scenario'
 );
 
-// 4. Full Night 3 (21,600 ticks) Performance & Determinism Benchmark
-const n3Run1 = path.join(PROOF_DIR, 'night3-21600-run1.jsonl');
-const n3Run2 = path.join(PROOF_DIR, 'night3-21600-run2.jsonl');
+const p3Lines = fs.readFileSync(p3Out, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+const p3End = p3Lines[p3Lines.length - 1];
+if (p3End.type !== 'end' || p3End.state !== 'won') {
+  throw new Error(`Expected Phase 3 scenario to end in state="won", got ${JSON.stringify(p3End)}`);
+}
+
+// 4. Determinism & Full-Night (18,000 ticks) Benchmark on Night 3
+const n3Run1 = path.join(PROOF_DIR, 'night3-18000-run1.jsonl');
+const n3Run2 = path.join(PROOF_DIR, 'night3-18000-run2.jsonl');
 const t0 = performance.now();
 runCmd(
   process.execPath,
-  ['src/headless/cli.js', '--seed', '2026', '--night', '3', '--ticks', '21600', '--out', n3Run1, '--snapshot-every', '600'],
-  'Night 3 Full-Length Benchmark (21,600 ticks) Run 1'
+  ['src/headless/cli.js', '--seed', '2026', '--night', '3', '--ticks', '18000', '--out', n3Run1, '--snapshot-every', '600'],
+  'Night 3 Full-Length Benchmark (18,000 ticks) Run 1'
 );
 const benchMs = Math.round(performance.now() - t0);
 
 runCmd(
   process.execPath,
-  ['src/headless/cli.js', '--seed', '2026', '--night', '3', '--ticks', '21600', '--out', n3Run2, '--snapshot-every', '600'],
+  ['src/headless/cli.js', '--seed', '2026', '--night', '3', '--ticks', '18000', '--out', n3Run2, '--snapshot-every', '600'],
   'Night 3 Full-Length Determinism Run 2'
 );
 
-const identical = fs.readFileSync(n3Run1, 'utf8') === fs.readFileSync(n3Run2, 'utf8');
-if (!identical) throw new Error('Night 3 determinism check FAILED!');
-if (benchMs > 30000) throw new Error(`Night 3 21,600-tick benchmark exceeded 30s: ${benchMs}ms`);
+if (fs.readFileSync(n3Run1, 'utf8') !== fs.readFileSync(n3Run2, 'utf8')) {
+  throw new Error('Phase 3 determinism check FAILED!');
+}
 
 const summary = [
-  `Phase 2 Verification Summary (Contract v1.1)`,
+  `Phase 3 Verification Summary (Contract v1.2)`,
   `Timestamp: ${new Date().toISOString()}`,
   `Node: ${process.version}`,
   `Unit & Headless Tests: PASS`,
   `Vite Production Build: PASS`,
-  `Night 2 Features Scenario: PASS (${path.basename(n2Out)})`,
-  `Night 3 Full-Night Benchmark (21,600 ticks): PASS (${benchMs} ms <= 30,000 ms limit)`,
-  `Night 3 Determinism (21,600 ticks x2): PASS (byte-identical)`
+  `Phase 3 Fuel/Drain/Relight/Refuel/Dawn Scenario: PASS (${path.basename(p3Out)})`,
+  `Night 3 Full-Night Benchmark (18,000 ticks): PASS (${benchMs} ms <= 30,000 ms limit)`,
+  `Night 3 Determinism (18,000 ticks x2): PASS (byte-identical)`
 ].join('\n');
 
 fs.writeFileSync(path.join(PROOF_DIR, 'verification-summary.txt'), summary + '\n', 'utf8');

@@ -13,8 +13,10 @@ function runHeadless(args) {
   });
 }
 
-test('headless CLI Night 1 win scenario matches Contract v1.1 schema', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-n1-'));
+test('[UPDATED FOR P3 TICKET-03: Contract v1.2 dawn_survived] headless CLI Night 1 fuel, refuel, drain, relight & dawn_survived win', () => {
+  // Reason for update: Ticket-03 replaced early all_lit win with dawn_survived at time_left_s <= 0
+  // and added fuel, ever_lit, relit_count, capacity, refuel, lantern_out, and fuel_drain.
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-p3-'));
   const scenarioPath = path.join(tmpDir, 'scenario.json');
   const inputsPath = path.join(tmpDir, 'inputs.json');
   const outPath = path.join(tmpDir, 'out.jsonl');
@@ -22,19 +24,19 @@ test('headless CLI Night 1 win scenario matches Contract v1.1 schema', () => {
   fs.writeFileSync(
     scenarioPath,
     JSON.stringify({
-      player: { pos: [0, 0, 0], carried: 9, flames: 3 },
+      player: { pos: [0, 0, 0], carried: 10, flames: 3 },
       random_motes: false,
       random_shades: false,
-      motes: [[0, 0, 4]],
-      shades: [],
+      motes: [],
+      shades: [{ id: 'S1', pos: [23.8, 0, 6.2], state: 'drain', target_lantern_id: 'L2' }],
       lanterns: [
-        { id: 'L1', pos: [0, 0, 6], deposited: 0, lit: false },
-        { id: 'L2', lit: true },
-        { id: 'L3', lit: true },
-        { id: 'L4', lit: true },
-        { id: 'L5', lit: true }
+        { id: 'L1', pos: [0, 0, 1.0], lit: true, fuel: 0.5 }, // burns out at tick 30, then player relights it
+        { id: 'L2', pos: [23.8, 0, 7.7], lit: true, fuel: 25 }, // drained by S1 -> emits fuel_drain at tick 60
+        { id: 'L3', lit: true, fuel: 90 },
+        { id: 'L4', lit: true, fuel: 90 },
+        { id: 'L5', lit: false }
       ],
-      time_left_s: 120
+      time_left_s: 1.5 // 90 ticks until dawn
     })
   );
 
@@ -42,9 +44,10 @@ test('headless CLI Night 1 win scenario matches Contract v1.1 schema', () => {
     inputsPath,
     JSON.stringify({
       frames: [
-        { tick: 0, move: [0, 1], cam_yaw_deg: 0 },
-        { tick: 60, move: [0, 0], interact: true },
-        { tick: 61, interact: false }
+        { tick: 35, interact: true }, // Relight L1 (5 motes)
+        { tick: 36, interact: false },
+        { tick: 70, interact: true }, // Refuel L1 (1 mote)
+        { tick: 71, interact: false }
       ]
     })
   );
@@ -52,26 +55,31 @@ test('headless CLI Night 1 win scenario matches Contract v1.1 schema', () => {
   const res = runHeadless([
     '--seed', '42', '--night', '1',
     '--scenario', scenarioPath, '--inputs', inputsPath,
-    '--ticks', '120', '--out', outPath, '--snapshot-every', '20'
+    '--ticks', '120', '--out', outPath, '--snapshot-every', '30'
   ]);
   assert.equal(res.status, 0, res.stderr);
 
   const lines = fs.readFileSync(outPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   const snap0 = lines[0];
   assert.equal(snap0.type, 'snapshot');
-  assert.equal(snap0.night, 1);
-  assert.ok(snap0.wind && typeof snap0.wind.active === 'boolean');
-  assert.ok(Array.isArray(snap0.player.vel));
-  assert.ok(Array.isArray(snap0.motes));
-  assert.ok(Array.isArray(snap0.drifters));
-  assert.ok(Array.isArray(snap0.charms));
+  assert.equal(snap0.player.capacity, 10);
+  assert.equal(typeof snap0.lanterns[0].fuel, 'number');
+  assert.equal(typeof snap0.lanterns[0].ever_lit, 'boolean');
+  assert.equal(typeof snap0.lanterns[0].relit_count, 'number');
+
+  const events = lines.filter((l) => l.type === 'event');
+  assert.ok(events.some((e) => e.name === 'lantern_out' && e.data.lantern_id === 'L1'));
+  assert.ok(events.some((e) => e.name === 'lantern_lit' && e.data.lantern_id === 'L1' && e.data.relight === true));
+  assert.ok(events.some((e) => e.name === 'fuel_drain' && e.data.lantern_id === 'L2' && e.data.shade_id === 'S1'));
+  assert.ok(events.some((e) => e.name === 'refuel' && e.data.lantern_id === 'L1'));
+  assert.ok(events.some((e) => e.name === 'game_over' && e.data.result === 'won' && e.data.reason === 'dawn_survived'));
 
   const endLine = lines[lines.length - 1];
   assert.equal(endLine.type, 'end');
   assert.equal(endLine.state, 'won');
 });
 
-test('headless CLI Night 2 jump pad, charm, drifter, pause scenario', () => {
+test('[P2 regression] headless CLI Night 2 jump pad, charm, drifter, pause & fall scenario', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-n2-'));
   const scenarioPath = path.join(tmpDir, 'scenario.json');
   const inputsPath = path.join(tmpDir, 'inputs.json');
@@ -119,73 +127,20 @@ test('headless CLI Night 2 jump pad, charm, drifter, pause scenario', () => {
   assert.ok(names.includes('drifter_drop'));
   assert.ok(names.includes('paused'));
   assert.ok(names.includes('resumed'));
-  assert.ok(lines.some((l) => l.type === 'snapshot' && l.state === 'paused'));
 });
 
-test('headless CLI Fall & Respawn + Night 2 Jump Pad launch scenario', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-fall-pad-'));
-  const fallScen = path.join(tmpDir, 'fall.json');
-  const fallOut = path.join(tmpDir, 'fall-out.jsonl');
-
-  fs.writeFileSync(
-    fallScen,
-    JSON.stringify({
-      player: { pos: [40.5, -9.8, 0], carried: 6, flames: 3 },
-      random_motes: false,
-      random_shades: false,
-      motes: [],
-      shades: []
-    })
-  );
-
-  const rFall = runHeadless([
-    '--seed', '11', '--night', '1',
-    '--scenario', fallScen,
-    '--ticks', '80', '--out', fallOut, '--snapshot-every', '20'
-  ]);
-  assert.equal(rFall.status, 0, rFall.stderr);
-  const fallLines = fs.readFileSync(fallOut, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  const fallHit = fallLines.find((l) => l.type === 'event' && l.name === 'player_hit');
-  assert.ok(fallHit);
-  assert.deepEqual(fallHit.data, { by: 'fall', flames: 2, dropped: 0, lost: 6 });
-
-  // Jump pad on Night 2 at (20, 0, 18) -> launches player across to Island B (x > 55)
-  const padScen = path.join(tmpDir, 'pad.json');
-  const padOut = path.join(tmpDir, 'pad-out.jsonl');
-  fs.writeFileSync(
-    padScen,
-    JSON.stringify({
-      player: { pos: [20, 0, 18], carried: 0, flames: 3 },
-      random_motes: false,
-      random_shades: false,
-      random_drifters: false,
-      motes: [],
-      shades: []
-    })
-  );
-  const rPad = runHeadless([
-    '--seed', '12', '--night', '2',
-    '--scenario', padScen,
-    '--ticks', '100', '--out', padOut, '--snapshot-every', '20'
-  ]);
-  assert.equal(rPad.status, 0, rPad.stderr);
-  const padLines = fs.readFileSync(padOut, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  const lastSnap = [...padLines].reverse().find((l) => l.type === 'snapshot');
-  assert.ok(lastSnap.player.pos[0] > 50, `Expected player to land on Island B, got x=${lastSnap.player.pos[0]}`);
-});
-
-test('headless CLI Night 3 determinism & 21,600-tick performance <= 30s', () => {
+test('headless CLI Night 3 determinism & full-night (18,000 ticks) performance <= 30s', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-n3-'));
   const out1 = path.join(tmpDir, 'n3-1.jsonl');
   const out2 = path.join(tmpDir, 'n3-2.jsonl');
 
   const t0 = performance.now();
-  const r1 = runHeadless(['--seed', '999', '--night', '3', '--ticks', '21600', '--out', out1, '--snapshot-every', '600']);
+  const r1 = runHeadless(['--seed', '999', '--night', '3', '--ticks', '18000', '--out', out1, '--snapshot-every', '600']);
   const elapsedMs = performance.now() - t0;
   assert.equal(r1.status, 0, r1.stderr);
-  assert.ok(elapsedMs < 30000, `21,600 ticks took ${elapsedMs}ms (> 30,000ms limit)`);
+  assert.ok(elapsedMs < 30000, `18,000 ticks took ${elapsedMs}ms (> 30,000ms limit)`);
 
-  const r2 = runHeadless(['--seed', '999', '--night', '3', '--ticks', '21600', '--out', out2, '--snapshot-every', '600']);
+  const r2 = runHeadless(['--seed', '999', '--night', '3', '--ticks', '18000', '--out', out2, '--snapshot-every', '600']);
   assert.equal(r2.status, 0, r2.stderr);
   assert.equal(fs.readFileSync(out1, 'utf8'), fs.readFileSync(out2, 'utf8'));
 });

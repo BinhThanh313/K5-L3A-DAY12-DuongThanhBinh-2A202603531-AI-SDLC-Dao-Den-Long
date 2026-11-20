@@ -1,0 +1,63 @@
+{
+  "player": {
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "carried": 10,
+    "flames": 3
+  },
+  "random_motes": false,
+  "random_shades": false,
+  "motes": [],
+  "shades": [
+    {
+      "id": "S1",
+      "pos": [
+        23.8,
+        0,
+        6.2
+      ],
+      "state": "drain",
+      "target_lantern_id": "L2"
+    }
+  ],
+  "lanterns": [
+    {
+      "id": "L1",
+      "pos": [
+        0,
+        0,
+        1
+      ],
+      "lit": true,
+      "fuel": 0.5
+    },
+    {
+      "id": "L2",
+      "pos": [
+        23.8,
+        0,
+        7.7
+      ],
+      "lit": true,
+      "fuel": 25
+    },
+    {
+      "id": "L3",
+      "lit": true,
+      "fuel": 90
+    },
+    {
+      "id": "L4",
+      "lit": true,
+      "fuel": 90
+    },
+    {
+      "id": "L5",
+      "lit": false
+    }
+  ],
+  "time_left_s": 1.5
+}

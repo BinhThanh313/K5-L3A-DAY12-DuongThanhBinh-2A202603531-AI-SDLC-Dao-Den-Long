@@ -27,3 +27,14 @@
 | Phase | Error | How Detected | Resolution |
 |---|---|---|---|
 | Phase 2 | Headless CLI loop checked `sim.state === 'playing'`, which would stop early when `state === 'paused'`. | Code review during v1.1 upgrade | Changed condition to `sim.state !== 'won' && sim.state !== 'lost'` and added headless pause/resume test. |
+
+## Phase 3 (Ticket-03 — Contract v1.2)
+- **Tools used:** Antigravity AI coding assistant (Gemini model).
+- **Estimated usage:** ~22k input tokens, ~11k output tokens (~$0.05–$0.09 equivalent).
+- **Token-saving strategies applied:**
+  1. Wrote `docs/notes/phase-3-adr.md` and `CHANGELOG.md` upfront to map out all 4 `[THAY THẾ]` rules before editing `src/sim/engine.js` in a single pass.
+  2. Used integer `1/60` fuel units (`6000 = 100.0 fuel`) as recommended by Ticket-03, avoiding floating-point precision debugging.
+
+| Phase | Error | How Detected | Resolution |
+|---|---|---|---|
+| Phase 3 | Pressing interact 1–2 ticks after lighting a lantern (`fuelUnits = 5998`, displayed `100.0`) triggered `refuel` with `used = 1` because Step 2 decayed `1/60` before Step 5. | Unit test `[P3] fuel decay, lantern_out, relight cost 5, and refuel formula` | Guarded Step 5 refuel eligibility with `fuelUnits < FUEL_MAX_UNITS - 3` (where 1-decimal fuel is `< 100.0`). |
