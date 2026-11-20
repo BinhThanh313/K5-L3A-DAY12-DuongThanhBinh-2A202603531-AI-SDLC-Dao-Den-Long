@@ -61,6 +61,7 @@ function formatKeyCode(code) {
 // Persisted Settings
 const SETTINGS_KEY = 'dao-den-long-settings-v1';
 const LEADERBOARD_LOCAL_KEY = 'dao-den-long-leaderboard-v1';
+const LAST_PLAYER_NAME_KEY = 'dao-den-long-player-name';
 function loadSettings() {
   const defaults = {
     volume: 0.7,
@@ -120,6 +121,7 @@ const offscreenArrow = document.getElementById('offscreen-arrow');
 const shadeArrow = document.getElementById('shade-arrow');
 
 const menuScreen = document.getElementById('menu-screen');
+const menuControlsGuide = document.getElementById('menu-controls-guide');
 const leaderboardScreen = document.getElementById('leaderboard-screen');
 const leaderboardBody = document.getElementById('leaderboard-body');
 const introScreen = document.getElementById('intro-screen');
@@ -1078,16 +1080,28 @@ async function renderLeaderboardScreen() {
     </table>`;
 }
 
-// Keybind UI rendering & HUD label sync
+// Keybind UI rendering & HUD/Cover label sync
 function updateHudControlHints() {
   const kb = settings.keybinds;
+  const moveStr = `${formatKeyCode(kb.moveUp)} ${formatKeyCode(kb.moveLeft)} ${formatKeyCode(kb.moveDown)} ${formatKeyCode(kb.moveRight)}`;
   if (hudPauseHint) {
     hudPauseHint.textContent = `${formatKeyCode(kb.pause)}/Esc: Tạm dừng · M: Tiếng`;
   }
   if (hudControlsHint) {
     hudControlsHint.textContent =
-      `${formatKeyCode(kb.moveUp)}${formatKeyCode(kb.moveLeft)}${formatKeyCode(kb.moveDown)}${formatKeyCode(kb.moveRight)} · ` +
-      `${formatKeyCode(kb.jump)}: Nhảy · ${formatKeyCode(kb.dash)}: Lướt · ${formatKeyCode(kb.interact)}: Nạp · ${formatKeyCode(kb.pulse)}: Tỏa sáng`;
+      `${moveStr} · ${formatKeyCode(kb.jump)}: Nhảy · ${formatKeyCode(kb.dash)}: Lướt · ${formatKeyCode(kb.interact)}: Nạp · ${formatKeyCode(kb.pulse)}: Tỏa sáng`;
+  }
+  if (menuControlsGuide) {
+    menuControlsGuide.innerHTML = `
+      <div><span class="key-pill">${moveStr}</span> Di chuyển</div>
+      <div><span class="key-pill">${formatKeyCode(kb.jump)}</span> Nhảy</div>
+      <div><span class="key-pill">${formatKeyCode(kb.dash)}</span> Lướt nhanh</div>
+      <div><span class="key-pill">${formatKeyCode(kb.interact)}</span> Thắp / Châm dầu</div>
+      <div><span class="key-pill">${formatKeyCode(kb.pulse)}</span> Tỏa Sáng (3 ✨)</div>
+      <div><span class="key-pill">Chuột / Q R</span> Xoay & Zoom</div>
+      <div><span class="key-pill">${formatKeyCode(kb.pause)} / Esc</span> Tạm dừng</div>
+      <div><span class="key-pill">M</span> Tắt / Bật tiếng</div>
+    `;
   }
 }
 
@@ -1284,6 +1298,9 @@ if (btnSaveScore) {
     }
     btnSaveScore.disabled = true;
     try {
+      try {
+        localStorage.setItem(LAST_PLAYER_NAME_KEY, check.value);
+      } catch {}
       await submitLeaderboardEntry({
         name: check.value,
         score: totalCampaignScore,
@@ -1292,7 +1309,7 @@ if (btnSaveScore) {
         seed: campaignSeed
       });
       lbSaveMsg.style.color = '#8BF2A0';
-      lbSaveMsg.textContent = `✓ Đã lưu kỷ lục của "${check.value}"!`;
+      lbSaveMsg.textContent = `✓ Đã lưu kỷ lục của "${check.value}" vào Bảng xếp hạng!`;
     } catch (err) {
       lbSaveMsg.style.color = '#FF8A8E';
       lbSaveMsg.textContent = `⚠ ${err.message}`;
@@ -1452,7 +1469,7 @@ function handleEvents(events) {
         const titleEl = document.getElementById('result-title');
         const reasonEl = document.getElementById('result-reason');
         const scoreEl = document.getElementById('result-score');
-        let allowLeaderboardSave = false;
+        const allowLeaderboardSave = true;
 
         if (ev.data.result === 'won') {
           sfx.playWin();
@@ -1460,7 +1477,7 @@ function handleEvents(events) {
           nightsWon = Math.min(3, nightsWon + 1);
           if (currentNight < 3) {
             titleEl.textContent = `${sim.map.name} — Hoàn Thành!`;
-            reasonEl.textContent = 'Đèn Lồng đã giữ vững ánh sáng tới bình minh. Sẵn sàng cho hòn đảo tiếp theo!';
+            reasonEl.textContent = 'Đèn Lồng đã giữ vững ánh sáng tới bình minh. Bạn có thể lưu điểm ngay hoặc sang hòn đảo tiếp theo!';
             scoreEl.textContent = `Điểm Đêm ${currentNight}: ${sim.score} · Tổng: ${totalCampaignScore}`;
             nextBtn.style.display = 'inline-block';
           } else {
@@ -1468,7 +1485,6 @@ function handleEvents(events) {
             reasonEl.textContent = 'Mây đã xua tan sương đen qua cả 3 Đêm. Bình minh ấm áp trở về với biển mây!';
             scoreEl.textContent = `Tổng điểm chiến dịch: ${totalCampaignScore}`;
             nextBtn.style.display = 'none';
-            allowLeaderboardSave = true;
           }
         } else {
           sfx.playLose();
@@ -1479,13 +1495,16 @@ function handleEvents(events) {
               : 'Mây đã mất hết Ngọn Lửa.';
           scoreEl.textContent = `Tổng điểm Đêm đã thắng: ${totalCampaignScore} (Đêm thắng: ${nightsWon}/3)`;
           nextBtn.style.display = 'none';
-          allowLeaderboardSave = true;
         }
 
         if (lbSubmitBox) {
           lbSubmitBox.style.display = allowLeaderboardSave ? 'block' : 'none';
           if (allowLeaderboardSave) {
-            lbNameInput.value = '';
+            let savedName = '';
+            try {
+              savedName = localStorage.getItem(LAST_PLAYER_NAME_KEY) || '';
+            } catch {}
+            lbNameInput.value = savedName;
             btnSaveScore.disabled = false;
             lbSaveMsg.textContent = '';
           }
