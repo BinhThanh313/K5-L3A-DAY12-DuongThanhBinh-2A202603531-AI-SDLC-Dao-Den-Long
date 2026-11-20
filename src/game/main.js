@@ -9,9 +9,9 @@ const SETTINGS_KEY = 'dao-den-long-settings-v1';
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { volume: 0.7, sensitivity: 0.35, ...JSON.parse(raw) };
+    if (raw) return { volume: 0.7, sensitivity: 0.35, colorblind: false, ...JSON.parse(raw) };
   } catch {}
-  return { volume: 0.7, sensitivity: 0.35 };
+  return { volume: 0.7, sensitivity: 0.35, colorblind: false };
 }
 function saveSettings(s) {
   try {
@@ -19,6 +19,7 @@ function saveSettings(s) {
   } catch {}
 }
 const settings = loadSettings();
+document.body.classList.toggle('colorblind', Boolean(settings.colorblind));
 const sfx = new SoundEffects(settings.volume);
 
 // DOM elements
@@ -32,6 +33,7 @@ const hudScore = document.getElementById('hud-score');
 const hudDash = document.getElementById('hud-dash');
 const hudPulse = document.getElementById('hud-pulse');
 const hudCharm = document.getElementById('hud-charm');
+const hudCarriedCap = document.getElementById('hud-carried-cap');
 const promptBanner = document.getElementById('prompt-banner');
 const windBanner = document.getElementById('wind-banner');
 const moteSlotsEl = document.getElementById('mote-slots');
@@ -47,15 +49,17 @@ const optVolume = document.getElementById('opt-volume');
 const optVolumeVal = document.getElementById('opt-volume-val');
 const optSens = document.getElementById('opt-sens');
 const optSensVal = document.getElementById('opt-sens-val');
+const optColorblind = document.getElementById('opt-colorblind');
 
 optVolume.value = String(settings.volume);
 optVolumeVal.textContent = `${Math.round(settings.volume * 100)}%`;
 optSens.value = String(settings.sensitivity);
 optSensVal.textContent = settings.sensitivity.toFixed(2);
+if (optColorblind) optColorblind.checked = Boolean(settings.colorblind);
 
-// Build 10 mote slots in HUD
+// Build up to 20 (capacity_max) mote slots in HUD
 const moteSlotEls = [];
-for (let i = 0; i < TUNING.carry_capacity; i++) {
+for (let i = 0; i < TUNING.capacity_max; i++) {
   const el = document.createElement('div');
   el.className = 'mote-slot';
   moteSlotsEl.appendChild(el);
@@ -617,6 +621,27 @@ function createLanternVisual(l) {
   core.position.y = 3.28;
   group.add(core);
 
+  // Diagonal torn paper mark on unlit lantern (non-color distinction for colorblind accessibility)
+  const tearStrip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.78, 0.96),
+    new THREE.MeshBasicMaterial({ color: 0x181924 })
+  );
+  tearStrip.rotation.z = 0.42;
+  core.add(tearStrip);
+
+  // 3D floating fuel bar above lantern roof
+  const fuelGroup = new THREE.Group();
+  fuelGroup.position.y = 5.15;
+  const fuelBg = new THREE.Mesh(
+    new THREE.BoxGeometry(1.44, 0.18, 0.08),
+    new THREE.MeshBasicMaterial({ color: 0x151828 })
+  );
+  const fuelMat = new THREE.MeshBasicMaterial({ color: PALETTE.gold });
+  const fuelFill = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.12, 0.1), fuelMat);
+  fuelGroup.add(fuelBg, fuelFill);
+  fuelGroup.visible = false;
+  group.add(fuelGroup);
+
   // Double-tiered pagoda roof with gold finial
   const roofLower = new THREE.Mesh(new THREE.ConeGeometry(1.08, 0.45, 8), woodMat);
   roofLower.position.y = 4.02;
@@ -644,7 +669,7 @@ function createLanternVisual(l) {
   group.add(safeRing);
 
   scene.add(group);
-  return { group, coreMat, light, safeRing };
+  return { group, core, coreMat, tearStrip, fuelGroup, fuelFill, fuelMat, light, safeRing };
 }
 
 function createMoteVisual() {
@@ -887,6 +912,13 @@ optSens.oninput = () => {
   settings.sensitivity = Number(optSens.value);
   optSensVal.textContent = settings.sensitivity.toFixed(2);
 };
+if (optColorblind) {
+  optColorblind.onchange = () => {
+    settings.colorblind = Boolean(optColorblind.checked);
+    document.body.classList.toggle('colorblind', settings.colorblind);
+    saveSettings(settings);
+  };
+}
 document.getElementById('btn-next-night').onclick = () => showNightIntro(currentNight + 1);
 document.getElementById('btn-retry-night').onclick = () => startNight(currentNight);
 document.getElementById('btn-result-menu').onclick = () => {
@@ -971,10 +1003,14 @@ function handleEvents(events) {
         sfx.playCharmPickup();
         break;
       case 'deposit':
+      case 'refuel':
         sfx.playDeposit();
         break;
       case 'lantern_lit':
         sfx.playLanternLit();
+        break;
+      case 'lantern_out':
+        sfx.playHit();
         break;
       case 'dash':
         sfx.playDash();
@@ -1148,25 +1184,52 @@ function syncVisuals(nowSec) {
     pulseWave.material.opacity = 0;
   }
 
-  // Lanterns
-  let nearbyUnlit = null;
+  // Lanterns (with fuel bar, 1 Hz low-fuel blink, and 20% unlit squash + torn paper strip)
+  let nearbyLantern = null;
+  let nearbyDist = Infinity;
+  const blink1Hz = Math.sin(nowSec * Math.PI * 2) > 0;
   for (const l of sim.lanterns) {
     const vis = lanternVisuals.get(l.id);
     if (!vis) continue;
+    const fuel = l.fuelUnits / 60;
+    const isLowFuel = l.lit && fuel < TUNING.low_fuel_threshold;
+
     if (l.lit) {
+      vis.core.scale.set(1, 1, 1);
+      vis.tearStrip.visible = false;
+      vis.fuelGroup.visible = !isLowFuel || blink1Hz;
+      vis.fuelGroup.lookAt(camera.position);
+      const frac = Math.max(0.02, Math.min(1, fuel / 100));
+      vis.fuelFill.scale.x = frac;
+      vis.fuelFill.position.x = -(1 - frac) * 0.68;
+      vis.fuelMat.color.setHex(
+        isLowFuel ? (settings.colorblind ? 0xffffff : PALETTE.danger) : PALETTE.gold
+      );
+
       vis.coreMat.color.setHex(PALETTE.lanternCore);
       vis.coreMat.emissive.setHex(PALETTE.lanternLit);
-      vis.coreMat.emissiveIntensity = 1.6;
-      vis.light.intensity = 4.2;
-      vis.safeRing.material.opacity = 0.28;
+      vis.coreMat.emissiveIntensity = isLowFuel ? (blink1Hz ? 1.65 : 0.45) : 1.6;
+      vis.light.intensity = isLowFuel ? (blink1Hz ? 4.0 : 1.2) : 4.2;
+      vis.safeRing.material.opacity = isLowFuel ? 0 : 0.28;
     } else {
-      const ratio = l.deposited / TUNING.lantern_cost;
+      // Unlit: 20% squashed & torn paper mark visible (non-color distinction)
+      vis.core.scale.set(0.8, 0.8, 0.8);
+      vis.tearStrip.visible = true;
+      vis.fuelGroup.visible = false;
+      const cost = l.everLit ? TUNING.relight_cost : TUNING.lantern_cost;
+      const ratio = l.deposited / cost;
       vis.coreMat.color.setHex(PALETTE.lanternUnlit).lerp(new THREE.Color(PALETTE.lanternLit), ratio);
-      vis.coreMat.emissiveIntensity = 0.3 + ratio * 0.9;
+      vis.coreMat.emissiveIntensity = 0.25 + ratio * 0.9;
       vis.light.intensity = ratio * 1.4;
       vis.safeRing.material.opacity = 0;
-      if (distXZ(sim.player.pos, l.pos) <= TUNING.interact_radius) {
-        nearbyUnlit = l;
+    }
+
+    // Eligible for interaction: unlit OR lit with fuel < 100
+    if (!l.lit || l.fuelUnits < 6000) {
+      const d = distXZ(sim.player.pos, l.pos);
+      if (d <= TUNING.interact_radius && d < nearbyDist) {
+        nearbyDist = d;
+        nearbyLantern = l;
       }
     }
   }
@@ -1206,6 +1269,9 @@ function syncVisuals(nowSec) {
     vis.coreGroup.position.y = Math.sin(phase) * 0.14;
     vis.rimRing.rotation.z = nowSec * 2.2;
 
+    const rimColor = settings.colorblind ? PALETTE.shadeRimColorblind : PALETTE.shadeRim;
+    vis.bodyMat.emissive.setHex(rimColor);
+
     if (s.state === 'spawning') {
       const fade = Math.max(0.1, 1 - (s.stateTicksLeft || 0) / 60);
       vis.bodyMat.transparent = true;
@@ -1213,7 +1279,7 @@ function syncVisuals(nowSec) {
       vis.group.scale.setScalar(0.45 + fade * 0.55);
       vis.bodyMat.color.setHex(PALETTE.shadeBody);
       vis.bodyMat.emissiveIntensity = 1.1;
-      vis.eyeMat.color.setHex(0xb88cff);
+      vis.eyeMat.color.setHex(rimColor);
       vis.coreGroup.rotation.x = 0;
       vis.tendrilsGroup.rotation.y = nowSec * 6;
       vis.stunHalo.visible = false;
@@ -1229,30 +1295,47 @@ function syncVisuals(nowSec) {
       vis.tendrilsGroup.rotation.y = nowSec * 0.8;
       vis.stunHalo.visible = true;
       vis.stunHalo.rotation.z = nowSec * 5;
+    } else if (s.state === 'drain') {
+      vis.bodyMat.transparent = false;
+      vis.bodyMat.opacity = 1;
+      vis.group.scale.setScalar(1.05 + Math.sin(nowSec * 12) * 0.06);
+      vis.bodyMat.color.setHex(PALETTE.shadeBody);
+      vis.bodyMat.emissiveIntensity = 1.25;
+      vis.eyeMat.color.setHex(PALETTE.gold);
+      vis.coreGroup.rotation.x = 0.28;
+      vis.coreGroup.rotation.z = 0;
+      vis.tendrilsGroup.rotation.y = nowSec * 8;
+      vis.stunHalo.visible = false;
     } else if (s.state === 'chase') {
+      vis.bodyMat.transparent = false;
+      vis.bodyMat.opacity = 1;
       vis.group.scale.setScalar(1.06);
       vis.bodyMat.color.setHex(PALETTE.shadeBody);
       vis.bodyMat.emissiveIntensity = 0.95;
-      vis.eyeMat.color.setHex(0xffffff);
-      vis.coreGroup.rotation.x = 0.22; // Lean forward aggressively
+      vis.eyeMat.color.setHex(settings.colorblind ? PALETTE.shadeRimColorblind : 0xffffff);
+      vis.coreGroup.rotation.x = 0.22;
       vis.coreGroup.rotation.z = 0;
       vis.tendrilsGroup.rotation.y = nowSec * 4.5;
       vis.stunHalo.visible = false;
     } else if (s.state === 'recoil') {
+      vis.bodyMat.transparent = false;
+      vis.bodyMat.opacity = 1;
       vis.group.scale.setScalar(0.95);
       vis.bodyMat.color.setHex(PALETTE.shadeBody);
       vis.bodyMat.emissiveIntensity = 0.5;
-      vis.eyeMat.color.setHex(0xd2a8ff);
-      vis.coreGroup.rotation.x = -0.25; // Lean back on recoil
+      vis.eyeMat.color.setHex(rimColor);
+      vis.coreGroup.rotation.x = -0.25;
       vis.coreGroup.rotation.z = 0;
       vis.tendrilsGroup.rotation.y = nowSec * 2;
       vis.stunHalo.visible = false;
     } else {
       // wander
+      vis.bodyMat.transparent = false;
+      vis.bodyMat.opacity = 1;
       vis.group.scale.setScalar(1);
       vis.bodyMat.color.setHex(PALETTE.shadeBody);
       vis.bodyMat.emissiveIntensity = 0.6;
-      vis.eyeMat.color.setHex(0xe6c8ff);
+      vis.eyeMat.color.setHex(rimColor);
       vis.coreGroup.rotation.x = 0.06;
       vis.coreGroup.rotation.z = Math.sin(phase * 0.5) * 0.06;
       vis.tendrilsGroup.rotation.y = nowSec * 1.8;
@@ -1313,12 +1396,18 @@ function syncVisuals(nowSec) {
 
   // HUD
   hudFlames.textContent = '🔥'.repeat(sim.player.flames) + '🖤'.repeat(Math.max(0, TUNING.flames - sim.player.flames));
-  hudTimer.textContent = formatTime(sim.timeLeftS);
+  const timeStr = formatTime(sim.timeLeftS);
+  hudTimer.textContent = sim.timeLeftS <= 30 && settings.colorblind ? `⚠ ${timeStr}` : timeStr;
   hudTimer.classList.toggle('danger', sim.timeLeftS <= 30);
-  hudLanterns.textContent = `${litCount}/${sim.lanterns.length}`;
+  const reqLit = Math.ceil(TUNING.win_ratio * sim.lanterns.length);
+  hudLanterns.textContent = `${litCount}/${sim.lanterns.length} (Cần ≥${reqLit})`;
   hudScore.textContent = String(sim.score);
 
+  if (hudCarriedCap) {
+    hudCarriedCap.textContent = `${sim.player.carried}/${sim.player.capacity}`;
+  }
   for (let i = 0; i < moteSlotEls.length; i++) {
+    moteSlotEls[i].style.display = i < sim.player.capacity ? 'block' : 'none';
     moteSlotEls[i].classList.toggle('filled', i < sim.player.carried);
   }
 
@@ -1344,8 +1433,15 @@ function syncVisuals(nowSec) {
         ? `Tỏa Sáng (Shift)<br/><b>Cần ${TUNING.pulse_cost} ✨</b>`
         : 'Tỏa Sáng (Shift)<br/><b>Sẵn sàng</b>';
 
-  if (nearbyUnlit && appMode === 'playing') {
-    promptBanner.textContent = `E — Nạp ánh sáng (${nearbyUnlit.deposited}/${TUNING.lantern_cost})`;
+  if (nearbyLantern && appMode === 'playing') {
+    if (!nearbyLantern.lit) {
+      const cost = nearbyLantern.everLit ? TUNING.relight_cost : TUNING.lantern_cost;
+      const label = nearbyLantern.everLit ? 'Thắp lại đèn' : 'Nạp ánh sáng';
+      promptBanner.textContent = `E — ${label} (${nearbyLantern.deposited}/${cost})`;
+    } else {
+      const f = Math.round(nearbyLantern.fuelUnits / 60);
+      promptBanner.textContent = `E — Châm dầu (${f}/100)`;
+    }
     promptBanner.classList.add('visible');
   } else {
     promptBanner.classList.remove('visible');
