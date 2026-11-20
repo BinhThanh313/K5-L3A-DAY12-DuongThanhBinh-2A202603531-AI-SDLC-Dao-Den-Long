@@ -1199,6 +1199,51 @@ function showOverlay(target) {
   );
 }
 
+function initMenuBackdrop() {
+  if (BENCH_MODE) return;
+  resetNightAtmosphere();
+  clearDynamicVisuals();
+  buildMapGeometry(1);
+  sim = null;
+
+  const cfg = getMapConfig(1);
+  ambientLight.intensity = 0.5;
+  cfg.lanterns.forEach((l, idx) => {
+    const vis = createLanternVisual(l);
+    const lit = idx < 3;
+    if (lit) {
+      vis.core.scale.set(1, 1, 1);
+      vis.tearStrip.visible = false;
+      vis.coreMat.color.setHex(PALETTE.lanternCore);
+      vis.coreMat.emissive.setHex(PALETTE.lanternLit);
+      vis.coreMat.emissiveIntensity = 1.65;
+      vis.light.intensity = 4.4;
+      vis.safeRing.material.opacity = 0.26;
+    } else {
+      vis.core.scale.set(0.8, 0.8, 0.8);
+      vis.tearStrip.visible = true;
+      vis.light.intensity = 0;
+      vis.safeRing.material.opacity = 0;
+    }
+    lanternVisuals.set(l.id, vis);
+  });
+
+  // Floating decorative fireflies drifting around the showcase island
+  cfg.motePoints.forEach((pt, idx) => {
+    const mesh = createMoteVisual();
+    mesh.position.set(pt[0], pt[1] + 0.9, pt[2]);
+    mesh.userData.basePos = pt;
+    moteVisuals.set(`MENU_M${idx}`, mesh);
+  });
+
+  playerMesh.position.set(0, 0, 0);
+  playerMesh.rotation.y = 0;
+  playerMesh.visible = true;
+  playerMesh.userData.footGlideGroup.visible = false;
+  windLeavesGroup.visible = false;
+  pulseWave.material.opacity = 0;
+}
+
 function showNightIntro(night) {
   currentNight = night;
   const cfg = getMapConfig(night);
@@ -1272,6 +1317,7 @@ document.getElementById('btn-retry-pause').onclick = () => startNight(currentNig
 document.getElementById('btn-menu-pause').onclick = () => {
   appMode = 'menu';
   hud.classList.remove('visible');
+  initMenuBackdrop();
   showOverlay(menuScreen);
 };
 document.getElementById('btn-open-settings').onclick = () => {
@@ -1333,9 +1379,9 @@ if (optLargeText) {
 document.getElementById('btn-next-night').onclick = () => showNightIntro(currentNight + 1);
 document.getElementById('btn-retry-night').onclick = () => startNight(currentNight);
 document.getElementById('btn-result-menu').onclick = () => {
-  resetNightAtmosphere();
   appMode = 'menu';
   hud.classList.remove('visible');
+  initMenuBackdrop();
   showOverlay(menuScreen);
 };
 
@@ -2287,6 +2333,8 @@ let prevJump = false;
 
 if (BENCH_MODE) {
   startBenchMode();
+} else {
+  initMenuBackdrop();
 }
 
 function pushOutCircleXZ(pos, cx, cz, minDist) {
@@ -2416,7 +2464,21 @@ function animate(now) {
     }
   }
 
-  syncVisuals(now / 1000);
+  if (!sim && (appMode === 'menu' || appMode === 'intro')) {
+    const t = now / 1000;
+    const angle = settings.reduceMotion ? 0.6 : t * 0.14;
+    camera.position.set(Math.cos(angle) * 34, 14.5 + Math.sin(t * 0.4) * (settings.reduceMotion ? 0 : 1.0), Math.sin(angle) * 34);
+    camera.lookAt(0, 2.0, 0);
+    playerMesh.userData.charmPivot.rotation.z = Math.sin(t * 3.0) * 0.14;
+    for (const mesh of moteVisuals.values()) {
+      const bp = mesh.userData.basePos;
+      if (bp) {
+        mesh.position.set(bp[0], bp[1] + 0.9 + Math.sin(t * 2.8 + bp[0] * 0.5) * 0.35, bp[2]);
+      }
+    }
+  } else {
+    syncVisuals(now / 1000);
+  }
   renderer.render(scene, camera);
 }
 
