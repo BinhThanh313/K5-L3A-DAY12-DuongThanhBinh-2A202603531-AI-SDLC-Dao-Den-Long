@@ -18,8 +18,8 @@ export function getMapConfig(night) {
     return {
       night: 1,
       name: 'Đêm 1 — Đảo Bến',
-      introQuote: 'Ông Đăng: "Đêm đầu tiên sương đen vừa kéo về. Hãy gom đom đóm thắp sáng 5 Đèn Lồng Lớn của Đảo Bến!"',
-      durationS: 300,
+      introQuote: 'Ông Đăng: "Đêm đầu tiên sương đen vừa kéo về. Hãy gom đom đóm thắp đèn và châm dầu giữ ít nhất 3/5 Đèn Lồng sáng tới Bình Minh!"',
+      durationS: 240,
       spawnPos: [0, 0, 0],
       shadeSpeed: 4.0,
       shadeSpawnIntervalTicks: 480, // 8s
@@ -60,8 +60,8 @@ export function getMapConfig(night) {
     return {
       night: 2,
       name: 'Đêm 2 — Đảo Cau',
-      introQuote: 'Ông Đăng: "Đảo Cau nối đôi bờ bằng cầu tre mảnh. Coi chừng Gió Lạc cướp sáng, và tận dụng Bùa Gió cùng bục nhảy!"',
-      durationS: 330,
+      introQuote: 'Ông Đăng: "Đảo Cau nối đôi bờ bằng cầu tre mảnh. Coi chừng Gió Lạc cướp sáng, Bóng Mực hút dầu và giữ ít nhất 4/6 đèn sáng tới Bình Minh!"',
+      durationS: 270,
       spawnPos: [0, 0, 0],
       shadeSpeed: 4.0,
       shadeSpawnIntervalTicks: 420, // 7s
@@ -98,8 +98,8 @@ export function getMapConfig(night) {
     return {
       night: 3,
       name: 'Đêm 3 — Đảo Chuông',
-      introQuote: 'Ông Đăng: "Đêm cuối cùng trên Đảo Chuông ba tầng! Gió lớn sắp nổi — hãy thắp trọn 7 Đèn Lồng Lớn đón Bình Minh!"',
-      durationS: 360,
+      introQuote: 'Ông Đăng: "Đêm cuối cùng trên Đảo Chuông ba tầng! Gió lớn sắp nổi — hãy châm dầu giữ ít nhất 5/7 Đèn Lồng sáng tới Bình Minh!"',
+      durationS: 300,
       spawnPos: [0, 0, -15],
       shadeSpeed: 4.5,
       shadeSpawnIntervalTicks: 360, // 6s

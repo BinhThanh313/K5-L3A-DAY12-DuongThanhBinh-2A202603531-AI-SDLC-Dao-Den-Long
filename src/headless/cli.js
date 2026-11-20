@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { GameSimulation } from '../sim/engine.js';
 
-const VALID_SHADE_STATES = new Set(['spawning', 'wander', 'chase', 'recoil', 'stunned']);
+const VALID_SHADE_STATES = new Set(['spawning', 'wander', 'chase', 'recoil', 'stunned', 'drain']);
 
 function fail(code, message) {
   process.stderr.write(`Error: ${message}\n`);
@@ -111,7 +111,15 @@ function validateScenario(data) {
     if (data.player.pos !== undefined && !isVec3(data.player.pos)) {
       fail(2, 'scenario.player.pos must be [x, y, z]');
     }
-    for (const intKey of ['carried', 'flames', 'invuln_ticks', 'dash_cd_ticks', 'pulse_cd_ticks', 'charm_ticks']) {
+    for (const intKey of [
+      'carried',
+      'flames',
+      'invuln_ticks',
+      'dash_cd_ticks',
+      'pulse_cd_ticks',
+      'charm_ticks',
+      'successful_lights'
+    ]) {
       if (
         data.player[intKey] !== undefined &&
         (!Number.isInteger(data.player[intKey]) || data.player[intKey] < 0)
@@ -158,6 +166,9 @@ function validateScenario(data) {
       if (s.state_ticks_left !== undefined && (!Number.isInteger(s.state_ticks_left) || s.state_ticks_left < 0)) {
         fail(2, 'scenario.shades[].state_ticks_left must be a non-negative integer');
       }
+      if (s.target_lantern_id !== undefined && s.target_lantern_id !== null && typeof s.target_lantern_id !== 'string') {
+        fail(2, 'scenario.shades[].target_lantern_id must be a string');
+      }
     }
   }
 
@@ -193,6 +204,12 @@ function validateScenario(data) {
       }
       if (l.lit !== undefined && typeof l.lit !== 'boolean') {
         fail(2, `scenario.lanterns[${l.id}].lit must be boolean`);
+      }
+      if (l.ever_lit !== undefined && typeof l.ever_lit !== 'boolean') {
+        fail(2, `scenario.lanterns[${l.id}].ever_lit must be boolean`);
+      }
+      if (l.fuel !== undefined && (typeof l.fuel !== 'number' || !Number.isFinite(l.fuel) || l.fuel < 0)) {
+        fail(2, `scenario.lanterns[${l.id}].fuel must be a non-negative number`);
       }
     }
   }

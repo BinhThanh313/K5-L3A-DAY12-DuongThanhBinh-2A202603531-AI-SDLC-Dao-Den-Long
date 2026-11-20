@@ -17,6 +17,8 @@ export const DRIFTER_FLEE_TICKS = 240;
 export const DRIFTER_DROP_FLEE_TICKS = 120;
 export const SHADE_DETECT_RADIUS = 12.0;
 export const SHADE_LEASH_RADIUS = 18.0;
+export const SHADE_DRAIN_RADIUS = 2.0;
+export const SHADE_DRAIN_CHASE_RADIUS = 6.0;
 export const SHADE_RECOIL_DIST = 2.0;
 export const SHADE_RECOIL_TICKS = 60;
 export const PULSE_PUSH_TICKS = 15;
@@ -26,21 +28,39 @@ export const WIND_DURATION_TICKS = 300;  // 5s
 export const WIND_WARN_TICKS = 120;      // 2s
 export const WIND_SPEED = 2.0;
 
+// Integer fuel math in 1/60 units (6000 units = 100.0 fuel)
+export const FUEL_UNITS_PER_SECOND = 60;
+export const FUEL_MAX_UNITS = 100 * FUEL_UNITS_PER_SECOND; // 6000
+export const FUEL_LOW_UNITS = 30 * FUEL_UNITS_PER_SECOND;  // 1800
+export const FUEL_PER_MOTE_UNITS = 10 * FUEL_UNITS_PER_SECOND; // 600
+
+export const SCORE_RELIGHT = 40;
+export const SCORE_STUN_DRAIN = 15;
+export const SCORE_DAWN_PER_LIT_LANTERN = 50;
+
 export const TUNING = {
   player_speed: 6.0,
   dash_speed: 14.0,
   dash_duration_s: 0.2,
   dash_cooldown_s: 1.5,
   carry_capacity: 10,
+  capacity_max: 20,
   lantern_cost: 10,
+  relight_cost: 5,
   lantern_count_night1: 5,
+  fuel_max: 100,
+  fuel_decay_per_s: 1.0,
+  fuel_per_mote: 10,
+  low_fuel_threshold: 30,
+  drain_per_s: 5,
+  win_ratio: 0.6,
   pickup_radius: 1.0,
   interact_radius: 2.0,
   pulse_cost: 3,
   pulse_radius: 5.0,
-  night1_duration_s: 300,
-  night2_duration_s: 330,
-  night3_duration_s: 360,
+  night1_duration_s: 240,
+  night2_duration_s: 270,
+  night3_duration_s: 300,
   flames: 3,
   invuln_s: 1.5,
   hit_drop_ratio: 0.5,
@@ -52,10 +72,10 @@ export const TUNING = {
   shade_hit_radius: 1.0,
   fall_enabled: true,
   score: {
-    per_mote: 10,
+    per_mote: 5,
     per_lantern: 100,
     per_stun: 5,
-    per_second_left: 2,
+    per_second_left: 0,
     per_flame_left: 50
   }
 };
@@ -74,6 +94,7 @@ export const PALETTE = {
   moteHalo: 0xffe58a,
   shadeBody: 0x120a1a,
   shadeRim: 0x7a3cff,
+  shadeRimColorblind: 0x00b3ff,
   shadeStunned: 0x3a3450,
   mayRobe: 0xe8e2d0,
   mayScarf: 0xc8102e,
