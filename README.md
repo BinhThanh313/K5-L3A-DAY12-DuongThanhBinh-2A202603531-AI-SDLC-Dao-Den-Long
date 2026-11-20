@@ -2,7 +2,7 @@
 
 Game 3D góc nhìn thứ ba (Three.js + WebGL2 + Pure ESM Simulation) qua **3 Đêm (Ba Hòn Đảo)**: điều khiển **Mây** (đội nón lá treo đèn lồng nhỏ) gom đom đóm thắp sáng và **châm dầu giữ các Đèn Lồng Lớn sáng tới Bình Minh** trên **Đảo Bến**, **Đảo Cau** và **Đảo Chuông**, ngăn **Bóng Mực hút dầu**, né **Gió Lạc**, tận dụng **Bùa Gió**, **Lướt** và **Tỏa Sáng**.
 
-> **Video demo:** Xem `docs/demo/demo.mp4` hoặc file đính kèm trong **GitHub Release `v1.0.0`**.
+> **Video demo & Bản phát hành (`v1.0.0`):** [Xem video demo (`demo.mp4`) và tải bản chạy web tĩnh tại GitHub Release `v1.0.0`](https://github.com/BinhThanh313/K5-L3A-DAY12-DuongThanhBinh-2A202603531-AI-SDLC-Dao-Den-Long/releases/tag/v1.0.0)
 
 ---
 
