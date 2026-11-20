@@ -173,8 +173,7 @@ export class GameSimulation {
       for (const item of scenario.shades) {
         const id = item.id || this._allocShadeId();
         const pos = [Number(item.pos[0]), Number(item.pos[1] ?? 0), Number(item.pos[2])];
-        const defaultState = distXZ(pos, this.player.pos) <= SHADE_DETECT_RADIUS ? 'chase' : 'wander';
-        const state = item.state || defaultState;
+        const state = item.state || 'wander';
         const stateTicksLeft =
           typeof item.state_ticks_left === 'number'
             ? item.state_ticks_left
@@ -183,7 +182,7 @@ export class GameSimulation {
               : state === 'recoil'
                 ? SHADE_RECOIL_TICKS
                 : state === 'spawning'
-                  ? 30
+                  ? 60
                   : 0;
         this.shades.push({
           id,
@@ -330,7 +329,7 @@ export class GameSimulation {
       id,
       pos: [pt[0], pt[1], pt[2]],
       state: 'spawning',
-      stateTicksLeft: 30,
+      stateTicksLeft: 60,
       pushTicksLeft: 0,
       pushDir: [1, 0],
       recoilDir: [1, 0],

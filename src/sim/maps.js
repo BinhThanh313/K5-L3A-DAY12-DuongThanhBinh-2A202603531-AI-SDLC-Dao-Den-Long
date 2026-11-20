@@ -100,7 +100,7 @@ export function getMapConfig(night) {
       name: 'Đêm 3 — Đảo Chuông',
       introQuote: 'Ông Đăng: "Đêm cuối cùng trên Đảo Chuông ba tầng! Gió lớn sắp nổi — hãy thắp trọn 7 Đèn Lồng Lớn đón Bình Minh!"',
       durationS: 360,
-      spawnPos: [0, 0, 0],
+      spawnPos: [0, 0, -15],
       shadeSpeed: 4.5,
       shadeSpawnIntervalTicks: 360, // 6s
       maxShades: 10,
@@ -213,6 +213,19 @@ export function resolveHorizontalCollision(map, oldX, oldZ, newX, newZ, currentY
         const nz = rTower > 1e-6 ? z / rTower : 0;
         x = nx * 2.0;
         z = nz * 2.0;
+        blocked = true;
+      }
+    }
+
+    // Tier 2 central cliff cylinder (r <= 8, Y=6) when below Tier 2 (currentY < 5.35)
+    if (currentY < 5.35) {
+      const newR = Math.hypot(x, z);
+      const oldR = Math.hypot(oldX, oldZ);
+      if (newR < 8.0 && oldR >= 8.0) {
+        const nx = newR > 1e-6 ? x / newR : 0;
+        const nz = newR > 1e-6 ? z / newR : -1;
+        x = nx * 8.02;
+        z = nz * 8.02;
         blocked = true;
       }
     }

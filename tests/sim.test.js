@@ -224,6 +224,36 @@ test('[P2] Wind Charm boosts speed to 7.2 m/s and removes dash cooldown', () => 
   assert.equal(sim.player.dashCdTicks, 0);
 });
 
+test('[P2] Night 2/3 spawn points, 60-tick shade spawning, scenario wander default, boolean invuln, tick 1 night_start', () => {
+  const simN2 = new GameSimulation({ seed: 1, night: 2 });
+  assert.deepEqual(simN2.player.pos, [0, 0, 0]);
+
+  const simN3 = new GameSimulation({
+    seed: 1,
+    night: 3,
+    scenario: {
+      shades: [{ id: 'S99', pos: [20, 0, 20] }] // no state specified -> defaults to wander
+    }
+  });
+  assert.deepEqual(simN3.player.pos, [0, 0, -15]);
+  assert.equal(simN3.shades[0].state, 'wander');
+  assert.equal(typeof simN3.getSnapshot().player.invuln, 'boolean');
+
+  const evTick1 = simN2.step({});
+  assert.ok(evTick1.some((e) => e.tick === 1 && e.name === 'night_start' && e.data.night === 2));
+
+  // Advance to tick 300 on Night 2 -> scheduled shades spawn in 'spawning' for 60 ticks
+  while (simN2.simTick < 300) simN2.step({});
+  assert.ok(simN2.shades.length > 0);
+  assert.equal(simN2.shades[0].state, 'spawning');
+  assert.equal(simN2.shades[0].stateTicksLeft, 60);
+
+  for (let i = 0; i < 59; i++) simN2.step({});
+  assert.equal(simN2.shades[0].state, 'spawning');
+  simN2.step({}); // 60th tick after spawn -> transitions to wander (or chase if within 12m)
+  assert.notEqual(simN2.shades[0].state, 'spawning');
+});
+
 test('[P2] Pause freezes sim_tick and timers while advancing tick', () => {
   const sim = new GameSimulation({
     seed: 1,

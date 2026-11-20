@@ -152,14 +152,8 @@ function buildMapGeometry(night) {
     t1Mesh.castShadow = true;
     worldGroup.add(t1Mesh);
 
-    // Tier 2: elevated circular deck (r=8, Y=5.3..6.0) with 4 slender support pillars so spawn (0,0,0) is open
-    addIslandDisk(0, 0, 8, 6.0, 0.8);
-    for (const deg of [45, 135, 225, 315]) {
-      const rad = (deg * Math.PI) / 180;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 5.4, 10), woodMat);
-      col.position.set(Math.cos(rad) * 7.0, 2.7, Math.sin(rad) * 7.0);
-      worldGroup.add(col);
-    }
+    // Tier 2: solid central cliff cylinder (r=8, Y=0..6), spawn is at (0, 0, -15)
+    addIslandDisk(0, 0, 8, 6.0, 6.0);
 
     // Bell Tower (r=2, h=8) on Tier 2 (Y=6..14)
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 8.0, 20), woodMat);
@@ -274,83 +268,104 @@ function createPlayerMesh() {
   arrow.position.set(0, 0.08, 0.85);
   group.add(arrow);
 
-  // Wind Charm (Bùa Gió) speed-boost aura around Mây
-  const charmAura = new THREE.Group();
-  const ringRed = new THREE.Mesh(
-    new THREE.TorusGeometry(0.78, 0.035, 8, 28),
-    new THREE.MeshBasicMaterial({ color: PALETTE.mayScarf, transparent: true, opacity: 0.85 })
-  );
-  ringRed.rotation.x = Math.PI / 2.3;
-  ringRed.position.y = 0.85;
-  charmAura.add(ringRed);
+  // Animated feet under Mây's robe
+  const footMat = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.8 });
+  const leftFoot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), footMat);
+  leftFoot.scale.set(0.85, 0.65, 1.35);
+  leftFoot.position.set(-0.15, 0.08, 0);
+  const rightFoot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), footMat);
+  rightFoot.scale.set(0.85, 0.65, 1.35);
+  rightFoot.position.set(0.15, 0.08, 0);
+  group.add(leftFoot, rightFoot);
 
-  const ringGold = new THREE.Mesh(
-    new THREE.TorusGeometry(0.92, 0.03, 8, 28),
-    new THREE.MeshBasicMaterial({ color: PALETTE.gold, transparent: true, opacity: 0.85 })
-  );
-  ringGold.rotation.x = -Math.PI / 2.5;
-  ringGold.position.y = 0.95;
-  charmAura.add(ringGold);
-
-  const groundVortex = new THREE.Mesh(
-    new THREE.RingGeometry(0.55, 1.05, 32),
+  // Sleek foot-level wind-wake crescent & ankle wind currents when gliding/boosted
+  const footGlideGroup = new THREE.Group();
+  const wakeArc = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.68, 24, 1, -Math.PI * 0.85, Math.PI * 0.7),
     new THREE.MeshBasicMaterial({
       color: PALETTE.gold,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.8,
       side: THREE.DoubleSide
     })
   );
-  groundVortex.rotation.x = -Math.PI / 2;
-  groundVortex.position.y = 0.05;
-  charmAura.add(groundVortex);
+  wakeArc.rotation.x = -Math.PI / 2;
+  wakeArc.position.set(0, 0.07, 0.15);
+  footGlideGroup.add(wakeArc);
 
-  // 3 orbiting mini Wind Charm talismans
-  const orbitGroup = new THREE.Group();
-  orbitGroup.position.y = 1.0;
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    const talisman = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 0.28, 0.04),
-      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? PALETTE.mayScarf : PALETTE.gold })
-    );
-    talisman.position.set(Math.cos(a) * 0.85, 0, Math.sin(a) * 0.85);
-    orbitGroup.add(talisman);
-  }
-  charmAura.add(orbitGroup);
-  charmAura.visible = false;
-  group.add(charmAura);
-
-  // Speed trail streaks when dashing or running with Wind Charm
-  const dashTrail = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
-    const streak = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.04, 1.35, 6),
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(
+      new THREE.ConeGeometry(0.08, 0.95, 6),
       new THREE.MeshBasicMaterial({
-        color: i % 2 === 0 ? PALETTE.gold : 0xffffff,
+        color: PALETTE.mayScarf,
         transparent: true,
-        opacity: 0.65
+        opacity: 0.75
       })
     );
-    streak.rotation.x = Math.PI / 2;
-    streak.position.set((i - 1.5) * 0.28, 0.45 + (i % 2) * 0.45, -0.85 - (i % 2) * 0.25);
-    dashTrail.add(streak);
+    wing.rotation.x = -Math.PI / 2;
+    wing.rotation.z = side * 0.25;
+    wing.position.set(side * 0.34, 0.14, -0.35);
+    footGlideGroup.add(wing);
   }
-  dashTrail.visible = false;
-  group.add(dashTrail);
+  footGlideGroup.visible = false;
+  group.add(footGlideGroup);
 
-  group.userData.charmAura = charmAura;
-  group.userData.ringRed = ringRed;
-  group.userData.ringGold = ringGold;
-  group.userData.orbitGroup = orbitGroup;
-  group.userData.groundVortex = groundVortex;
-  group.userData.dashTrail = dashTrail;
+  group.userData.leftFoot = leftFoot;
+  group.userData.rightFoot = rightFoot;
+  group.userData.footGlideGroup = footGlideGroup;
+  group.userData.wakeArc = wakeArc;
 
   return group;
 }
 
 const playerMesh = createPlayerMesh();
 scene.add(playerMesh);
+
+// World-space footstep wind-ripples & gliding dust puffs left behind at Mây's feet
+const footRipplePool = [];
+for (let i = 0; i < 28; i++) {
+  const rippleGroup = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.18, 0.36, 20),
+    new THREE.MeshBasicMaterial({
+      color: i % 2 === 0 ? PALETTE.gold : 0xffffff,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  rippleGroup.add(ring);
+
+  const puffL = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: i % 3 === 0 ? PALETTE.mayScarf : PALETTE.moteCore,
+      transparent: true,
+      opacity: 0
+    })
+  );
+  puffL.position.set(-0.22, 0.08, 0);
+  const puffR = puffL.clone();
+  puffR.position.set(0.22, 0.08, 0);
+  rippleGroup.add(puffL, puffR);
+
+  rippleGroup.visible = false;
+  scene.add(rippleGroup);
+  footRipplePool.push({
+    group: rippleGroup,
+    ringMat: ring.material,
+    puffMat: puffL.material,
+    puffL,
+    puffR,
+    life: 0,
+    maxLife: 0.42,
+    vx: 0,
+    vz: 0
+  });
+}
+let nextRippleIdx = 0;
+let lastRippleTime = 0;
 
 const pulseWave = new THREE.Mesh(
   new THREE.RingGeometry(0.5, 1.0, 48),
@@ -863,20 +878,66 @@ function syncVisuals(nowSec) {
     sim.player.fallRespawnTicks === 0 &&
     (sim.player.invulnTicks === 0 || Math.floor(nowSec * 14) % 2 === 0);
 
-  // Wind Charm (Bùa Gió) aura & speed trail animation on Mây
+  // Foot-level stride & world-space wind-ripple gliding trail
   const hasCharm = sim.player.charmTicks > 0;
-  const isMoving = Math.hypot(sim.player.vel[0], sim.player.vel[2]) > 0.5;
-  playerMesh.userData.charmAura.visible = hasCharm;
-  playerMesh.userData.scarfMat.emissiveIntensity = hasCharm ? 1.1 + Math.sin(nowSec * 10) * 0.3 : 0;
-  if (hasCharm) {
-    playerMesh.userData.ringRed.rotation.z = nowSec * 6.5;
-    playerMesh.userData.ringGold.rotation.z = -nowSec * 5.2;
-    playerMesh.userData.orbitGroup.rotation.y = nowSec * 5.5;
-    playerMesh.userData.orbitGroup.position.y = 0.95 + Math.sin(nowSec * 6) * 0.12;
-    const pulseScale = 1 + Math.sin(nowSec * 8) * 0.12;
-    playerMesh.userData.groundVortex.scale.set(pulseScale, pulseScale, 1);
+  const isDashing = sim.player.dashTicks > 0;
+  const horizSpeed = Math.hypot(sim.player.vel[0], sim.player.vel[2]);
+  const isMoving = horizSpeed > 0.5;
+  const isGliding = isDashing || (hasCharm && isMoving);
+
+  playerMesh.userData.scarfMat.emissiveIntensity = hasCharm ? 0.9 + Math.sin(nowSec * 10) * 0.25 : 0;
+  playerMesh.userData.footGlideGroup.visible = isGliding;
+
+  if (isMoving) {
+    const strideFreq = hasCharm || isDashing ? 18 : 11;
+    const stride = Math.sin(nowSec * strideFreq);
+    playerMesh.userData.leftFoot.position.z = stride * 0.22;
+    playerMesh.userData.leftFoot.position.y = 0.08 + Math.max(0, stride) * 0.1;
+    playerMesh.userData.rightFoot.position.z = -stride * 0.22;
+    playerMesh.userData.rightFoot.position.y = 0.08 + Math.max(0, -stride) * 0.1;
+  } else {
+    playerMesh.userData.leftFoot.position.set(-0.15, 0.08, 0);
+    playerMesh.userData.rightFoot.position.set(0.15, 0.08, 0);
   }
-  playerMesh.userData.dashTrail.visible = sim.player.dashTicks > 0 || (hasCharm && isMoving);
+
+  if (isGliding) {
+    const wakeScale = isDashing ? 1.25 : 0.95 + Math.sin(nowSec * 14) * 0.1;
+    playerMesh.userData.wakeArc.scale.set(wakeScale, wakeScale, 1);
+
+    // Emit world-space ground wind-ripples & gliding puffs under Mây's feet
+    const interval = isDashing ? 0.025 : 0.045;
+    if (nowSec - lastRippleTime >= interval && sim.player.fallRespawnTicks === 0) {
+      lastRippleTime = nowSec;
+      const item = footRipplePool[nextRippleIdx];
+      nextRippleIdx = (nextRippleIdx + 1) % footRipplePool.length;
+      item.life = item.maxLife;
+      item.group.visible = true;
+      item.group.position.set(sim.player.pos[0], sim.player.pos[1] + 0.05, sim.player.pos[2]);
+      item.group.rotation.y = sim.player.facingYaw;
+      item.group.scale.setScalar(isDashing ? 0.85 : 0.65);
+      item.vx = -Math.sin(sim.player.facingYaw) * (isDashing ? 2.4 : 1.3);
+      item.vz = -Math.cos(sim.player.facingYaw) * (isDashing ? 2.4 : 1.3);
+    }
+  }
+
+  // Update world-space footstep wind ripples
+  for (const item of footRipplePool) {
+    if (item.life > 0) {
+      item.life = Math.max(0, item.life - 0.016);
+      const t = 1 - item.life / item.maxLife; // 0 -> 1
+      item.group.position.x += item.vx * 0.016;
+      item.group.position.z += item.vz * 0.016;
+      const sc = 0.65 + t * 1.45;
+      item.group.scale.set(sc, 1, sc);
+      item.ringMat.opacity = (1 - t) * 0.75;
+      item.puffMat.opacity = (1 - t) * 0.55;
+      item.puffL.position.x = -0.18 - t * 0.35;
+      item.puffL.position.y = 0.06 + t * 0.22;
+      item.puffR.position.x = 0.18 + t * 0.35;
+      item.puffR.position.y = 0.06 + t * 0.22;
+      if (item.life === 0) item.group.visible = false;
+    }
+  }
 
   // Pulse wave
   if (pulseWaveAnim > 0) {
@@ -947,7 +1008,10 @@ function syncVisuals(nowSec) {
     vis.rimRing.rotation.z = nowSec * 2.2;
 
     if (s.state === 'spawning') {
-      vis.group.scale.setScalar(0.55 + Math.abs(Math.sin(nowSec * 6)) * 0.4);
+      const fade = Math.max(0.1, 1 - (s.stateTicksLeft || 0) / 60);
+      vis.bodyMat.transparent = true;
+      vis.bodyMat.opacity = fade;
+      vis.group.scale.setScalar(0.45 + fade * 0.55);
       vis.bodyMat.color.setHex(PALETTE.shadeBody);
       vis.bodyMat.emissiveIntensity = 1.1;
       vis.eyeMat.color.setHex(0xb88cff);
@@ -955,6 +1019,8 @@ function syncVisuals(nowSec) {
       vis.tendrilsGroup.rotation.y = nowSec * 6;
       vis.stunHalo.visible = false;
     } else if (s.state === 'stunned') {
+      vis.bodyMat.transparent = false;
+      vis.bodyMat.opacity = 1;
       vis.group.scale.setScalar(1);
       vis.bodyMat.color.setHex(PALETTE.shadeStunned);
       vis.bodyMat.emissiveIntensity = 0.25;
