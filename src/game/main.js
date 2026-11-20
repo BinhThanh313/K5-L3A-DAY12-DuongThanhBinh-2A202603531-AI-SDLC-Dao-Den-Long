@@ -489,6 +489,9 @@ function clearDynamicVisuals() {
 }
 
 function showOverlay(target) {
+  if (target && document.pointerLockElement) {
+    document.exitPointerLock?.();
+  }
   [menuScreen, introScreen, pauseScreen, settingsScreen, resultScreen].forEach((el) =>
     el.classList.toggle('visible', el === target)
   );
