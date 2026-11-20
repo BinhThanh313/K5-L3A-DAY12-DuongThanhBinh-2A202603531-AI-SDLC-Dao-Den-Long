@@ -469,8 +469,12 @@ let totalCampaignScore = 0;
 let settingsReturnTo = 'menu';
 let sim = null;
 let camYawDeg = 0;
+let camPitchDeg = 28;
+let camDist = 12.0;
+const camPivot = new THREE.Vector3(0, 1.2, 0);
 let isDragging = false;
 let lastMouseX = 0;
+let lastMouseY = 0;
 let lastCountdownSec = -1;
 const keys = new Set();
 let pauseKeyQueued = false;
@@ -517,6 +521,9 @@ function startNight(night) {
   }
   hudNightName.textContent = sim.map.name.toUpperCase();
   camYawDeg = 0;
+  camPitchDeg = 28;
+  camDist = 12.0;
+  camPivot.set(sim.player.pos[0], sim.player.pos[1] + 1.2, sim.player.pos[2]);
   lastCountdownSec = -1;
   pulseWaveAnim = 0;
   appMode = 'playing';
@@ -587,19 +594,41 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 renderer.domElement.addEventListener('mousedown', (e) => {
-  if (e.button === 0) {
+  if (appMode !== 'playing') return;
+  if (e.button === 0 || e.button === 2) {
     isDragging = true;
     lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }
+});
+renderer.domElement.addEventListener('dblclick', () => {
+  if (appMode === 'playing' && document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock?.();
   }
 });
 window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('blur', () => { isDragging = false; });
 window.addEventListener('mousemove', (e) => {
-  if (!isDragging || appMode !== 'playing') return;
-  const dx = e.clientX - lastMouseX;
+  if (appMode !== 'playing') return;
+  const locked = document.pointerLockElement === renderer.domElement;
+  if (!locked && !isDragging) return;
+  const dx = locked ? e.movementX : e.clientX - lastMouseX;
+  const dy = locked ? e.movementY : e.clientY - lastMouseY;
   lastMouseX = e.clientX;
-  camYawDeg = (camYawDeg - dx * settings.sensitivity + 360) % 360;
+  lastMouseY = e.clientY;
+  camYawDeg = (((camYawDeg - dx * settings.sensitivity) % 360) + 360) % 360;
+  camPitchDeg = Math.max(12, Math.min(65, camPitchDeg + dy * settings.sensitivity * 0.65));
 });
+renderer.domElement.addEventListener(
+  'wheel',
+  (e) => {
+    if (appMode !== 'playing') return;
+    camDist = Math.max(7.5, Math.min(18.0, camDist + e.deltaY * 0.008));
+  },
+  { passive: true }
+);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -889,15 +918,19 @@ function syncVisuals(nowSec) {
     if (!cIds.has(id)) { scene.remove(mesh); charmVisuals.delete(id); }
   }
 
-  // Camera follow
+  // Spherical orbit camera follow (never clips through Mây on fast turns)
+  const desiredPivot = new THREE.Vector3(sim.player.pos[0], sim.player.pos[1] + 1.2, sim.player.pos[2]);
+  camPivot.lerp(desiredPivot, 0.25);
   const yawRad = (camYawDeg * Math.PI) / 180;
-  const targetCamPos = new THREE.Vector3(
-    sim.player.pos[0] - Math.sin(yawRad) * 11.5,
-    sim.player.pos[1] + 6.8,
-    sim.player.pos[2] - Math.cos(yawRad) * 11.5
+  const pitchRad = (camPitchDeg * Math.PI) / 180;
+  const horizDist = camDist * Math.cos(pitchRad);
+  const vertDist = camDist * Math.sin(pitchRad);
+  camera.position.set(
+    camPivot.x - Math.sin(yawRad) * horizDist,
+    camPivot.y + vertDist,
+    camPivot.z - Math.cos(yawRad) * horizDist
   );
-  camera.position.lerp(targetCamPos, 0.12);
-  camera.lookAt(sim.player.pos[0], sim.player.pos[1] + 1.2, sim.player.pos[2]);
+  camera.lookAt(camPivot);
 
   // HUD
   hudFlames.textContent = '🔥'.repeat(sim.player.flames) + '🖤'.repeat(Math.max(0, TUNING.flames - sim.player.flames));
