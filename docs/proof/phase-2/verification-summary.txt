@@ -1,0 +1,8 @@
+Phase 2 Verification Summary (Contract v1.1)
+Timestamp: 2026-11-20T08:10:56.721Z
+Node: v26.13.1
+Unit & Headless Tests: PASS
+Vite Production Build: PASS
+Night 2 Features Scenario: PASS (out-night2-features.jsonl)
+Night 3 Full-Night Benchmark (21,600 ticks): PASS (161 ms <= 30,000 ms limit)
+Night 3 Determinism (21,600 ticks x2): PASS (byte-identical)
