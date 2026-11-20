@@ -122,6 +122,58 @@ test('headless CLI Night 2 jump pad, charm, drifter, pause scenario', () => {
   assert.ok(lines.some((l) => l.type === 'snapshot' && l.state === 'paused'));
 });
 
+test('headless CLI Fall & Respawn + Night 2 Jump Pad launch scenario', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-fall-pad-'));
+  const fallScen = path.join(tmpDir, 'fall.json');
+  const fallOut = path.join(tmpDir, 'fall-out.jsonl');
+
+  fs.writeFileSync(
+    fallScen,
+    JSON.stringify({
+      player: { pos: [40.5, -9.8, 0], carried: 6, flames: 3 },
+      random_motes: false,
+      random_shades: false,
+      motes: [],
+      shades: []
+    })
+  );
+
+  const rFall = runHeadless([
+    '--seed', '11', '--night', '1',
+    '--scenario', fallScen,
+    '--ticks', '80', '--out', fallOut, '--snapshot-every', '20'
+  ]);
+  assert.equal(rFall.status, 0, rFall.stderr);
+  const fallLines = fs.readFileSync(fallOut, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const fallHit = fallLines.find((l) => l.type === 'event' && l.name === 'player_hit');
+  assert.ok(fallHit);
+  assert.deepEqual(fallHit.data, { by: 'fall', flames: 2, dropped: 0, lost: 6 });
+
+  // Jump pad on Night 2 at (20, 0, 18) -> launches player across to Island B (x > 55)
+  const padScen = path.join(tmpDir, 'pad.json');
+  const padOut = path.join(tmpDir, 'pad-out.jsonl');
+  fs.writeFileSync(
+    padScen,
+    JSON.stringify({
+      player: { pos: [20, 0, 18], carried: 0, flames: 3 },
+      random_motes: false,
+      random_shades: false,
+      random_drifters: false,
+      motes: [],
+      shades: []
+    })
+  );
+  const rPad = runHeadless([
+    '--seed', '12', '--night', '2',
+    '--scenario', padScen,
+    '--ticks', '100', '--out', padOut, '--snapshot-every', '20'
+  ]);
+  assert.equal(rPad.status, 0, rPad.stderr);
+  const padLines = fs.readFileSync(padOut, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const lastSnap = [...padLines].reverse().find((l) => l.type === 'snapshot');
+  assert.ok(lastSnap.player.pos[0] > 50, `Expected player to land on Island B, got x=${lastSnap.player.pos[0]}`);
+});
+
 test('headless CLI Night 3 determinism & 21,600-tick performance <= 30s', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-n3-'));
   const out1 = path.join(tmpDir, 'n3-1.jsonl');

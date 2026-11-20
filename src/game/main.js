@@ -284,6 +284,29 @@ pulseWave.rotation.x = -Math.PI / 2;
 scene.add(pulseWave);
 let pulseWaveAnim = 0;
 
+// Wind leaves particle group for Night 3 wind warning & active gust
+const windLeavesGroup = new THREE.Group();
+const leafGeo = new THREE.PlaneGeometry(0.28, 0.16);
+const leafMat = new THREE.MeshBasicMaterial({
+  color: PALETTE.gold,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.85
+});
+for (let i = 0; i < 45; i++) {
+  const leaf = new THREE.Mesh(leafGeo, leafMat);
+  leaf.userData = {
+    ox: (Math.random() - 0.5) * 26,
+    oy: 0.6 + Math.random() * 5.5,
+    oz: (Math.random() - 0.5) * 26,
+    phase: Math.random() * Math.PI * 2
+  };
+  windLeavesGroup.add(leaf);
+}
+windLeavesGroup.visible = false;
+scene.add(windLeavesGroup);
+let prevWindWarning = false;
+
 // Pools
 const lanternVisuals = new Map();
 const moteVisuals = new Map();
@@ -970,6 +993,31 @@ function syncVisuals(nowSec) {
     promptBanner.classList.add('visible');
   } else {
     promptBanner.classList.remove('visible');
+  }
+
+  if (sim.wind.warning && !prevWindWarning) {
+    sfx.playWindWarning();
+  }
+  prevWindWarning = sim.wind.warning;
+
+  if (sim.wind.warning || sim.wind.active) {
+    windLeavesGroup.visible = true;
+    const wRad = (sim.wind.dirDeg * Math.PI) / 180;
+    const wx = Math.cos(wRad);
+    const wz = Math.sin(wRad);
+    const speed = sim.wind.active ? 14 : 6;
+    for (const leaf of windLeavesGroup.children) {
+      const u = leaf.userData;
+      const drift = (nowSec * speed + u.phase * 4) % 26 - 13;
+      leaf.position.set(
+        sim.player.pos[0] + u.ox + wx * drift,
+        sim.player.pos[1] + u.oy + Math.sin(nowSec * 4 + u.phase) * 0.4,
+        sim.player.pos[2] + u.oz + wz * drift
+      );
+      leaf.rotation.set(nowSec * 3 + u.phase, nowSec * 2, u.phase);
+    }
+  } else {
+    windLeavesGroup.visible = false;
   }
 
   if (sim.wind.warning) {
