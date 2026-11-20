@@ -67,32 +67,79 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(PALETTE.sky);
 scene.fog = new THREE.FogExp2(PALETTE.fog, 0.016);
 
-const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 260);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 280);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 container.insertBefore(renderer.domElement, container.firstChild);
 
 const ambientLight = new THREE.AmbientLight(0xd9e3ff, 0.15);
 scene.add(ambientLight);
 
-const moonLight = new THREE.DirectionalLight(0xb8c8ff, 0.65);
-moonLight.position.set(25, 45, 20);
+// Hemisphere light gives true 3D top-vs-side shading on every mesh
+const hemiLight = new THREE.HemisphereLight(0x748ce0, 0x0b1024, 0.55);
+scene.add(hemiLight);
+
+const moonLight = new THREE.DirectionalLight(0xc8d6ff, 0.95);
+moonLight.position.set(38, 62, -28);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 1024;
-moonLight.shadow.mapSize.height = 1024;
+moonLight.shadow.mapSize.width = 2048;
+moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.camera.near = 5;
+moonLight.shadow.camera.far = 180;
+moonLight.shadow.camera.left = -65;
+moonLight.shadow.camera.right = 105;
+moonLight.shadow.camera.top = 65;
+moonLight.shadow.camera.bottom = -65;
+moonLight.shadow.bias = -0.0005;
 scene.add(moonLight);
 
-// Cloud sea plane below islands
+// 3D Starfield dome & glowing 3D Moon
+const starGeo = new THREE.BufferGeometry();
+const starPts = [];
+for (let i = 0; i < 320; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.random() * Math.PI * 0.44;
+  const r = 145;
+  starPts.push(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi) + 12, r * Math.sin(phi) * Math.sin(theta));
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPts, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: PALETTE.moteCore, size: 0.75 })));
+
+const moonMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(5.5, 24, 24),
+  new THREE.MeshBasicMaterial({ color: PALETTE.lanternCore })
+);
+moonMesh.position.set(65, 78, -55);
+scene.add(moonMesh);
+
+// Cloud sea plane + 3D volumetric rolling cloud clusters below islands
 const cloudSea = new THREE.Mesh(
-  new THREE.CircleGeometry(180, 48),
-  new THREE.MeshStandardMaterial({ color: PALETTE.cloudSea, roughness: 1, transparent: true, opacity: 0.88 })
+  new THREE.CircleGeometry(210, 48),
+  new THREE.MeshStandardMaterial({ color: PALETTE.cloudSea, roughness: 1, transparent: true, opacity: 0.9 })
 );
 cloudSea.rotation.x = -Math.PI / 2;
 cloudSea.position.y = -10.2;
 scene.add(cloudSea);
+
+const cloudPuffMat = new THREE.MeshStandardMaterial({
+  color: PALETTE.cloudSea,
+  roughness: 0.95,
+  transparent: true,
+  opacity: 0.78
+});
+for (let i = 0; i < 42; i++) {
+  const a = (i / 42) * Math.PI * 2;
+  const dist = 50 + (i % 5) * 14;
+  const puff = new THREE.Mesh(new THREE.SphereGeometry(5.5 + (i % 4) * 2.2, 12, 10), cloudPuffMat);
+  puff.scale.set(1.7, 0.48, 1.25);
+  puff.position.set(15 + Math.cos(a) * dist, -6.2 - (i % 3) * 1.3, Math.sin(a) * dist);
+  scene.add(puff);
+}
 
 // Map geometry container
 const worldGroup = new THREE.Group();
@@ -102,39 +149,119 @@ function buildMapGeometry(night) {
   while (worldGroup.children.length > 0) {
     worldGroup.remove(worldGroup.children[0]);
   }
-  const grassMat = new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 0.9 });
-  const sandMat = new THREE.MeshStandardMaterial({ color: PALETTE.sand, roughness: 0.92 });
-  const woodMat = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.85 });
+  const grassMat = new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 0.86 });
+  const sandMat = new THREE.MeshStandardMaterial({ color: PALETTE.sand, roughness: 0.9 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.82 });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x454b66, roughness: 0.85 });
 
-  const addIslandDisk = (cx, cz, r, yTop, height = 3.0) => {
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, height, 48), sandMat);
+  // Multi-layered 3D island disk with cliff strata, sandy rim, grassy terrain & 3D stone paths
+  const addIslandDisk = (cx, cz, r, yTop, height = 4.2) => {
+    const underCliff = new THREE.Mesh(
+      new THREE.CylinderGeometry(r * 0.88, r * 0.62, height * 1.1, 32),
+      stoneMat
+    );
+    underCliff.position.set(cx, yTop - height * 1.35, cz);
+    worldGroup.add(underCliff);
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.88, height, 48), sandMat);
     base.position.set(cx, yTop - height / 2, cz);
     base.receiveShadow = true;
+    base.castShadow = true;
     worldGroup.add(base);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r * 0.9, 0.08, 48), grassMat);
-    top.position.set(cx, yTop + 0.02, cz);
+
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.91, r * 0.93, 0.16, 48), grassMat);
+    top.position.set(cx, yTop - 0.04, cz);
     top.receiveShadow = true;
     worldGroup.add(top);
+
+    // 3D Stone plaza & concentric cobblestone rings for strong 3D ground depth perception
+    const plaza = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.1, 0.08, 16), stoneMat);
+    plaza.position.set(cx, yTop + 0.03, cz);
+    plaza.receiveShadow = true;
+    worldGroup.add(plaza);
+
+    if (r >= 20) {
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const tile = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.07, 0.9), stoneMat);
+        tile.position.set(cx + Math.cos(a) * (r * 0.55), yTop + 0.03, cz + Math.sin(a) * (r * 0.55));
+        tile.rotation.y = -a;
+        tile.receiveShadow = true;
+        worldGroup.add(tile);
+      }
+    }
+  };
+
+  // Helper: 3D stylized coastal tree / Areca palm (purely decorative at island rim)
+  const addArecaPalm = (x, y, z, scale = 1) => {
+    const tree = new THREE.Group();
+    tree.position.set(x, y, z);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * scale, 0.22 * scale, 4.2 * scale, 8), woodMat);
+    trunk.position.y = 2.1 * scale;
+    trunk.castShadow = true;
+    tree.add(trunk);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.45 * scale, 1.8 * scale, 5), grassMat);
+      frond.position.set(Math.cos(a) * 0.7 * scale, 4.1 * scale, Math.sin(a) * 0.7 * scale);
+      frond.rotation.z = -Math.cos(a) * 1.1;
+      frond.rotation.x = Math.sin(a) * 1.1;
+      frond.castShadow = true;
+      tree.add(frond);
+    }
+    worldGroup.add(tree);
+  };
+
+  const addRockCluster = (x, y, z, s = 1) => {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75 * s, 0), stoneMat);
+    rock.scale.set(1.2, 0.75, 1.0);
+    rock.position.set(x, y + 0.35 * s, z);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    worldGroup.add(rock);
   };
 
   if (night === 1) {
-    addIslandDisk(0, 0, 40, 0, 3.2);
+    addIslandDisk(0, 0, 40, 0, 4.2);
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.1, 8), woodMat);
-      post.position.set(Math.cos(a) * 39.2, 0.55, Math.sin(a) * 39.2);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 1.25, 8), woodMat);
+      post.position.set(Math.cos(a) * 39.1, 0.62, Math.sin(a) * 39.1);
+      post.castShadow = true;
       worldGroup.add(post);
+      if (i % 3 === 0) {
+        addRockCluster(Math.cos(a + 0.1) * 37.8, 0, Math.sin(a + 0.1) * 37.8, 0.9);
+      }
+      if (i % 4 === 1) {
+        addArecaPalm(Math.cos(a) * 36.5, 0, Math.sin(a) * 36.5, 0.85);
+      }
     }
   } else if (night === 2) {
-    addIslandDisk(0, 0, 28, 0, 3.2);
-    addIslandDisk(70, 0, 28, 0, 3.2);
-    // Bamboo bridge x in [26, 44], z in [-2, 2]
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(18, 0.35, 4), woodMat);
-    bridge.position.set(35, -0.15, 0);
-    bridge.receiveShadow = true;
-    worldGroup.add(bridge);
+    addIslandDisk(0, 0, 28, 0, 4.2);
+    addIslandDisk(70, 0, 28, 0, 4.2);
+    for (const cx of [0, 70]) {
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 + 0.2;
+        if (Math.abs(Math.sin(a)) < 0.25) continue; // keep bridge approach clear
+        addArecaPalm(cx + Math.cos(a) * 25.2, 0, Math.sin(a) * 25.2, 1.05);
+      }
+    }
+    // 3D Segmented Bamboo bridge x in [26, 44], z in [-2, 2]
+    const bridgeBeamL = new THREE.Mesh(new THREE.BoxGeometry(18, 0.28, 0.28), woodMat);
+    bridgeBeamL.position.set(35, -0.14, -1.85);
+    const bridgeBeamR = bridgeBeamL.clone();
+    bridgeBeamR.position.z = 1.85;
+    worldGroup.add(bridgeBeamL, bridgeBeamR);
+    for (let bx = 26.5; bx <= 43.5; bx += 0.9) {
+      const plank = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.95, 8), woodMat);
+      plank.rotation.x = Math.PI / 2;
+      plank.position.set(bx, -0.06, 0);
+      plank.receiveShadow = true;
+      plank.castShadow = true;
+      worldGroup.add(plank);
+    }
   } else if (night === 3) {
-    addIslandDisk(0, 0, 45, 0, 3.2);
+    addIslandDisk(0, 0, 45, 0, 4.2);
 
     // Tier 1: exact solid semicircular ring (r=12..24, z>0, Y=0..3) matching maps.js 100%
     const t1Shape = new THREE.Shape();
@@ -152,21 +279,53 @@ function buildMapGeometry(night) {
     t1Mesh.castShadow = true;
     worldGroup.add(t1Mesh);
 
+    // 3D Stone parapet bollards along Tier 1 rim so cliff edge is unmistakably 3D
+    for (let deg = 10; deg <= 170; deg += 20) {
+      if (Math.abs(deg - 30) < 12 || Math.abs(deg - 150) < 12) continue;
+      const rad = (deg * Math.PI) / 180;
+      const bollard = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.55, 0.45), stoneMat);
+      bollard.position.set(Math.cos(rad) * 23.6, 3.27, Math.sin(rad) * 23.6);
+      bollard.castShadow = true;
+      worldGroup.add(bollard);
+    }
+
     // Tier 2: solid central cliff cylinder (r=8, Y=0..6), spawn is at (0, 0, -15)
     addIslandDisk(0, 0, 8, 6.0, 6.0);
 
-    // Bell Tower (r=2, h=8) on Tier 2 (Y=6..14)
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 8.0, 20), woodMat);
-    tower.position.set(0, 10.0, 0);
-    worldGroup.add(tower);
-    const bellRoof = new THREE.Mesh(
-      new THREE.ConeGeometry(2.8, 2.2, 8),
-      new THREE.MeshStandardMaterial({ color: PALETTE.gold, emissive: PALETTE.lanternLit, emissiveIntensity: 0.25 })
-    );
-    bellRoof.position.set(0, 15.0, 0);
-    worldGroup.add(bellRoof);
+    // Ornate 3D Multi-Tiered Pagoda Bell Tower (r=2, h=8) on Tier 2 (Y=6..14)
+    const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.25, 1.2, 12), stoneMat);
+    towerBase.position.set(0, 6.6, 0);
+    towerBase.castShadow = true;
+    worldGroup.add(towerBase);
 
-    // 2 Ramps at 30 deg & 150 deg (from r=30 Y=0 to r=24 Y=3, width 3) with exact YXZ rotation + glowing guide rails
+    const towerCore = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.75, 6.8, 12), woodMat);
+    towerCore.position.set(0, 10.4, 0);
+    towerCore.castShadow = true;
+    worldGroup.add(towerCore);
+
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 7.0, 8), woodMat);
+      col.position.set(Math.cos(a) * 1.85, 10.5, Math.sin(a) * 1.85);
+      col.castShadow = true;
+      worldGroup.add(col);
+    }
+
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: PALETTE.gold,
+      emissive: PALETTE.lanternLit,
+      emissiveIntensity: 0.25,
+      roughness: 0.4
+    });
+    const lowerEave = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.2, 8), roofMat);
+    lowerEave.position.set(0, 11.2, 0);
+    lowerEave.castShadow = true;
+    const upperRoof = new THREE.Mesh(new THREE.ConeGeometry(2.7, 2.1, 8), roofMat);
+    upperRoof.position.set(0, 14.6, 0);
+    upperRoof.castShadow = true;
+    worldGroup.add(lowerEave, upperRoof);
+
+    // 2 Ramps at 30 deg & 150 deg with 3D stepped planks & glowing handrails
     const railMat = new THREE.MeshStandardMaterial({
       color: PALETTE.gold,
       emissive: PALETTE.lanternLit,
@@ -182,15 +341,21 @@ function buildMapGeometry(night) {
       rampGroup.rotation.y = -rad;
       rampGroup.rotation.z = -Math.atan2(3, 6);
 
-      const deck = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.26, 3.0), woodMat);
-      deck.position.y = -0.13;
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.32, 3.0), woodMat);
+      deck.position.y = -0.16;
       deck.receiveShadow = true;
+      deck.castShadow = true;
       rampGroup.add(deck);
 
-      for (const side of [-1.45, 1.45]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.14, 0.14), railMat);
-        rail.position.set(0, 0.25, side);
+      for (const side of [-1.42, 1.42]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 0.16, 0.16), railMat);
+        rail.position.set(0, 0.38, side);
         rampGroup.add(rail);
+        for (const px of [-2.6, 0, 2.6]) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.45, 0.16), woodMat);
+          post.position.set(px, 0.18, side);
+          rampGroup.add(post);
+        }
       }
       worldGroup.add(rampGroup);
     }
@@ -409,31 +574,65 @@ function createLanternVisual(l) {
   const group = new THREE.Group();
   group.position.set(l.pos[0], l.pos[1], l.pos[2]);
 
-  const pillar = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2, 0.28, 2.6, 10),
-    new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.85 })
-  );
-  pillar.position.y = 1.3;
+  const woodMat = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.8 });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x454b66, roughness: 0.88 });
+
+  // 2-step 3D stone pedestal
+  const step1 = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.2, 0.28, 8), stoneMat);
+  step1.position.y = 0.14;
+  step1.castShadow = true;
+  step1.receiveShadow = true;
+  const step2 = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.85, 0.32, 8), stoneMat);
+  step2.position.y = 0.42;
+  step2.castShadow = true;
+  group.add(step1, step2);
+
+  // Main wooden column
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.3, 10), woodMat);
+  pillar.position.y = 1.65;
+  pillar.castShadow = true;
   group.add(pillar);
+
+  // Lantern housing platform & 4 corner cage ribs
+  const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.52, 0.18, 8), woodMat);
+  tray.position.y = 2.65;
+  tray.castShadow = true;
+  group.add(tray);
+
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.25, 6), woodMat);
+    rib.position.set(Math.cos(a) * 0.52, 3.28, Math.sin(a) * 0.52);
+    rib.castShadow = true;
+    group.add(rib);
+  }
 
   const coreMat = new THREE.MeshStandardMaterial({
     color: PALETTE.lanternUnlit,
     emissive: 0x1a1e2e,
-    emissiveIntensity: 0.3
+    emissiveIntensity: 0.3,
+    roughness: 0.35
   });
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 1.05, 8), coreMat);
-  core.position.y = 3.0;
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.4, 1.12, 12), coreMat);
+  core.position.y = 3.28;
   group.add(core);
 
-  const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(0.85, 0.55, 8),
-    new THREE.MeshStandardMaterial({ color: PALETTE.wood })
+  // Double-tiered pagoda roof with gold finial
+  const roofLower = new THREE.Mesh(new THREE.ConeGeometry(1.08, 0.45, 8), woodMat);
+  roofLower.position.y = 4.02;
+  roofLower.castShadow = true;
+  const roofUpper = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.45, 8), woodMat);
+  roofUpper.position.y = 4.38;
+  roofUpper.castShadow = true;
+  const finial = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshStandardMaterial({ color: PALETTE.gold, emissive: PALETTE.lanternLit, emissiveIntensity: 0.5 })
   );
-  roof.position.y = 3.75;
-  group.add(roof);
+  finial.position.y = 4.68;
+  group.add(roofLower, roofUpper, finial);
 
-  const light = new THREE.PointLight(PALETTE.lanternLit, 0, 18, 1.4);
-  light.position.y = 3.1;
+  const light = new THREE.PointLight(PALETTE.lanternLit, 0, 20, 1.4);
+  light.position.y = 3.3;
   group.add(light);
 
   const safeRing = new THREE.Mesh(

@@ -1,19 +1,19 @@
-✔ headless CLI Night 1 win scenario matches Contract v1.1 schema (78.1962ms)
-✔ headless CLI Night 2 jump pad, charm, drifter, pause scenario (65.4994ms)
-✔ headless CLI Fall & Respawn + Night 2 Jump Pad launch scenario (129.4272ms)
-✔ headless CLI Night 3 determinism & 21,600-tick performance <= 30s (192.5487ms)
-✔ headless CLI returns exit code 2 on invalid inputs/scenario (112.6445ms)
-✔ game.contract.json v1.1 tuning matches src/sim/config.js (2.9383ms)
-✔ [P1 regression - updated to v1.1 speed 6.0] movement, cam_yaw_deg rotation, and normalization (2.9987ms)
-✔ [P1 regression - updated to v1.1 pickup_radius 1.0, cap 10, deposit scoring] mote pickup (0.2761ms)
-✔ [P1 regression - updated to v1.1 scoring] deposit lights final lantern and wins with bonuses (0.2091ms)
-✔ [P1 regression - updated to v1.1 pulse 3 cost, 5m 3D radius, 15-tick push] pulse stuns and pushes (6.5851ms)
-✔ [P2] dash moves at 14 m/s for 12 ticks, preserves air altitude, and has 90-tick cooldown (0.3256ms)
-✔ [P2] fall off island ignores invuln, loses all carried motes, respawns after 60 ticks (0.3621ms)
-✔ [P2] Drifter steals motes and drops them when pulsed while fleeing (0.4631ms)
-✔ [P2] Wind Charm boosts speed to 7.2 m/s and removes dash cooldown (0.2788ms)
-✔ [P2] Night 2/3 spawn points, 60-tick shade spawning, scenario wander default, boolean invuln, tick 1 night_start (4.1134ms)
-✔ [P2] Pause freezes sim_tick and timers while advancing tick (0.2287ms)
+✔ headless CLI Night 1 win scenario matches Contract v1.1 schema (69.8131ms)
+✔ headless CLI Night 2 jump pad, charm, drifter, pause scenario (61.8739ms)
+✔ headless CLI Fall & Respawn + Night 2 Jump Pad launch scenario (125.3541ms)
+✔ headless CLI Night 3 determinism & 21,600-tick performance <= 30s (192.009ms)
+✔ headless CLI returns exit code 2 on invalid inputs/scenario (110.5178ms)
+✔ game.contract.json v1.1 tuning matches src/sim/config.js (1.5756ms)
+✔ [P1 regression - updated to v1.1 speed 6.0] movement, cam_yaw_deg rotation, and normalization (2.9672ms)
+✔ [P1 regression - updated to v1.1 pickup_radius 1.0, cap 10, deposit scoring] mote pickup (0.2575ms)
+✔ [P1 regression - updated to v1.1 scoring] deposit lights final lantern and wins with bonuses (0.2243ms)
+✔ [P1 regression - updated to v1.1 pulse 3 cost, 5m 3D radius, 15-tick push] pulse stuns and pushes (6.5308ms)
+✔ [P2] dash moves at 14 m/s for 12 ticks, preserves air altitude, and has 90-tick cooldown (0.321ms)
+✔ [P2] fall off island ignores invuln, loses all carried motes, respawns after 60 ticks (0.272ms)
+✔ [P2] Drifter steals motes and drops them when pulsed while fleeing (0.3622ms)
+✔ [P2] Wind Charm boosts speed to 7.2 m/s and removes dash cooldown (0.2304ms)
+✔ [P2] Night 2/3 spawn points, 60-tick shade spawning, scenario wander default, boolean invuln, tick 1 night_start (3.4047ms)
+✔ [P2] Pause freezes sim_tick and timers while advancing tick (0.2391ms)
 ℹ tests 16
 ℹ suites 0
 ℹ pass 16
@@ -21,4 +21,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 667.9563
+ℹ duration_ms 668.3671
