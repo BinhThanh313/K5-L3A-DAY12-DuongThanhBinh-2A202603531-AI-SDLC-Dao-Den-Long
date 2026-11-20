@@ -239,14 +239,20 @@ if (!BENCH_MODE) {
   }
 }
 
-// Map geometry container
+// Map geometry container & 3D solid prop colliders (visual-layer only, never alters headless src/sim/)
 const worldGroup = new THREE.Group();
 scene.add(worldGroup);
+const worldColliders = [];
+
+function addSolidCollider(x, z, r, yMin = 0, yMax = 5.0) {
+  worldColliders.push({ x, z, r, yMin, yMax });
+}
 
 function buildMapGeometry(night) {
   while (worldGroup.children.length > 0) {
     worldGroup.remove(worldGroup.children[0]);
   }
+  worldColliders.length = 0;
   const grassMat = new THREE.MeshStandardMaterial({ color: PALETTE.grass, roughness: 0.86 });
   const sandMat = new THREE.MeshStandardMaterial({ color: PALETTE.sand, roughness: 0.9 });
   const woodMat = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.82 });
@@ -308,6 +314,7 @@ function buildMapGeometry(night) {
       tree.add(frond);
     }
     worldGroup.add(tree);
+    addSolidCollider(x, z, 0.28 * scale + 0.42, y, y + 4.8 * scale);
   };
 
   const addRockCluster = (x, y, z, s = 1) => {
@@ -317,6 +324,7 @@ function buildMapGeometry(night) {
     rock.castShadow = true;
     rock.receiveShadow = true;
     worldGroup.add(rock);
+    addSolidCollider(x, z, 0.85 * s + 0.38, y, y + 0.95 * s);
   };
 
   if (night === 1) {
@@ -324,10 +332,13 @@ function buildMapGeometry(night) {
     if (!BENCH_MODE) {
       for (let i = 0; i < 24; i++) {
         const a = (i / 24) * Math.PI * 2;
+        const px = Math.cos(a) * 39.1;
+        const pz = Math.sin(a) * 39.1;
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 1.25, 8), woodMat);
-        post.position.set(Math.cos(a) * 39.1, 0.62, Math.sin(a) * 39.1);
+        post.position.set(px, 0.62, pz);
         post.castShadow = true;
         worldGroup.add(post);
+        addSolidCollider(px, pz, 0.65, 0, 1.3);
         if (i % 3 === 0) {
           addRockCluster(Math.cos(a + 0.1) * 37.8, 0, Math.sin(a + 0.1) * 37.8, 0.9);
         }
@@ -383,16 +394,20 @@ function buildMapGeometry(night) {
     for (let deg = 10; deg <= 170; deg += 20) {
       if (Math.abs(deg - 30) < 12 || Math.abs(deg - 150) < 12) continue;
       const rad = (deg * Math.PI) / 180;
+      const bx = Math.cos(rad) * 23.6;
+      const bz = Math.sin(rad) * 23.6;
       const bollard = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.55, 0.45), stoneMat);
-      bollard.position.set(Math.cos(rad) * 23.6, 3.27, Math.sin(rad) * 23.6);
+      bollard.position.set(bx, 3.27, bz);
       bollard.castShadow = true;
       worldGroup.add(bollard);
+      addSolidCollider(bx, bz, 0.62, 3.0, 3.65);
     }
 
     // Tier 2: solid central cliff cylinder (r=8, Y=0..6), spawn is at (0, 0, -15)
     addIslandDisk(0, 0, 8, 6.0, 6.0);
 
     // Ornate 3D Multi-Tiered Pagoda Bell Tower (r=2, h=8) on Tier 2 (Y=6..14)
+    addSolidCollider(0, 0, 2.65, 5.5, 15.0);
     const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.25, 1.2, 12), stoneMat);
     towerBase.position.set(0, 6.6, 0);
     towerBase.castShadow = true;
@@ -2150,6 +2165,51 @@ if (BENCH_MODE) {
   startBenchMode();
 }
 
+function pushOutCircleXZ(pos, cx, cz, minDist) {
+  const dx = pos[0] - cx;
+  const dz = pos[2] - cz;
+  const d = Math.hypot(dx, dz);
+  if (d < minDist) {
+    const nx = d > 1e-6 ? dx / d : 1;
+    const nz = d > 1e-6 ? dz / d : 0;
+    pos[0] = cx + nx * minDist;
+    pos[2] = cz + nz * minDist;
+  }
+}
+
+// Solid 3D prop & lantern pedestal collision for interactive 3D play
+// (lives only in src/game/ so src/sim/ headless output stays 100% deterministic)
+function resolve3DVisualCollisions() {
+  if (!sim || BENCH_MODE || sim.player.fallRespawnTicks > 0) return;
+
+  const py = sim.player.pos[1];
+  const playerTop = py + 1.7;
+
+  // 1. Great Lantern stone pedestals (pedestal r=1.2 + Mây body ~0.25 -> 1.45 < interact_radius 2.0)
+  for (const l of sim.lanterns) {
+    if (playerTop > l.pos[1] && py < l.pos[1] + 4.8) {
+      pushOutCircleXZ(sim.player.pos, l.pos[0], l.pos[2], 1.45);
+    }
+    for (const s of sim.shades) {
+      if (s.pos[1] + 1.8 > l.pos[1] && s.pos[1] < l.pos[1] + 4.8) {
+        pushOutCircleXZ(s.pos, l.pos[0], l.pos[2], 1.35);
+      }
+    }
+  }
+
+  // 2. Solid 3D map props (Areca palms, rocks, wooden posts, bollards, pagoda bell tower)
+  for (const c of worldColliders) {
+    if (playerTop > c.yMin && py < c.yMax) {
+      pushOutCircleXZ(sim.player.pos, c.x, c.z, c.r);
+    }
+  }
+
+  // 3. Night 3 Tier 2 central cliff visual margin (so Mây's robe doesn't poke into the cliff cylinder)
+  if (sim.night === 3 && py < 5.35) {
+    pushOutCircleXZ(sim.player.pos, 0, 0, 8.42);
+  }
+}
+
 function animate(now) {
   if (BENCH_MODE) {
     if (benchFinished) return;
@@ -2227,6 +2287,7 @@ function animate(now) {
         dash: keys.has(kb.dash) || keys.has('ControlLeft'),
         pause: pauseNow
       });
+      resolve3DVisualCollisions();
       handleEvents(events);
     }
   }
