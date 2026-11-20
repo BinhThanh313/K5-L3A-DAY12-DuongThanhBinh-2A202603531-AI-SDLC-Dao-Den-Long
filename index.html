@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đảo Đèn Lồng — Đêm 1: Đảo Bến</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0a18;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        color: #fff6e5;
+        user-select: none;
+      }
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .hud-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .panel {
+        background: rgba(16, 13, 30, 0.72);
+        border: 1px solid rgba(255, 196, 107, 0.32);
+        border-radius: 12px;
+        padding: 10px 14px;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+      }
+      .stat-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .label-dim {
+        font-size: 12px;
+        color: #c8bddc;
+        font-weight: 500;
+      }
+      .gold {
+        color: #ffca6b;
+      }
+      .violet {
+        color: #c59bff;
+      }
+      .hud-right {
+        text-align: right;
+      }
+      #mute-btn {
+        pointer-events: auto;
+        margin-top: 6px;
+        background: rgba(255, 202, 107, 0.14);
+        color: #ffe2a8;
+        border: 1px solid rgba(255, 202, 107, 0.35);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #mute-btn:hover {
+        background: rgba(255, 202, 107, 0.28);
+      }
+      .hud-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      #prompt-banner {
+        background: rgba(255, 179, 71, 0.2);
+        border: 1px solid rgba(255, 202, 107, 0.7);
+        color: #ffe9b8;
+        padding: 7px 16px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      #prompt-banner.visible {
+        opacity: 1;
+      }
+      .controls-bar {
+        font-size: 12px;
+        color: #cfc6e3;
+        background: rgba(14, 11, 26, 0.65);
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(9, 7, 20, 0.78);
+        backdrop-filter: blur(8px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      #overlay.visible {
+        display: flex;
+      }
+      .modal {
+        width: min(440px, 90vw);
+        background: linear-gradient(160deg, rgba(28, 22, 48, 0.96), rgba(14, 11, 26, 0.98));
+        border: 1px solid rgba(255, 198, 102, 0.45);
+        border-radius: 18px;
+        padding: 28px 26px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      }
+      .modal h1 {
+        font-size: 26px;
+        margin-bottom: 8px;
+        color: #ffd37d;
+      }
+      .modal p {
+        font-size: 14px;
+        color: #d8d0ea;
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+      .modal-score {
+        font-size: 32px;
+        font-weight: 700;
+        color: #ffbe55;
+        margin-bottom: 20px;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #ffae42, #ff8533);
+        color: #1a1024;
+        border: none;
+        border-radius: 10px;
+        padding: 11px 26px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(255, 155, 66, 0.35);
+      }
+      .btn-primary:hover {
+        filter: brightness(1.08);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="hud">
+        <div class="hud-top">
+          <div class="panel">
+            <div style="font-size: 12px; color: #ffca6b; margin-bottom: 6px; letter-spacing: 0.4px">
+              ĐÊM 1 · ĐẢO BẾN
+            </div>
+            <div class="stat-row">
+              <div class="stat-item"><span>🔥</span><span id="hud-flames">3/3</span></div>
+              <div class="stat-item gold"><span>✨</span><span id="hud-carried">0/5</span></div>
+              <div class="stat-item gold"><span>🏮</span><span id="hud-lanterns">0/5</span></div>
+            </div>
+          </div>
+          <div class="panel hud-right">
+            <div class="stat-row" style="justify-content: flex-end">
+              <div class="stat-item"><span class="label-dim">THỜI GIAN</span> <span id="hud-time">04:00</span></div>
+              <div class="stat-item gold"><span class="label-dim">ĐIỂM</span> <span id="hud-score">0</span></div>
+            </div>
+            <div style="margin-top: 4px; font-size: 12px" id="hud-pulse" class="violet">
+              Tỏa sáng (Shift): Cần 1 ✨
+            </div>
+            <button id="mute-btn" type="button">🔊 Âm thanh: Bật (M)</button>
+          </div>
+        </div>
+        <div class="hud-bottom">
+          <div id="prompt-banner">Nhấn E để nạp ánh sáng vào Đèn Lồng</div>
+          <div class="controls-bar">
+            WASD: Di chuyển · Space: Nhảy · E: Thắp đèn · Shift: Tỏa sáng (1 ✨) · Kéo chuột / Q,R: Xoay camera
+          </div>
+        </div>
+      </div>
+
+      <div id="overlay">
+        <div class="modal">
+          <h1 id="overlay-title">Đảo Đèn Lồng Bừng Sáng!</h1>
+          <p id="overlay-reason"></p>
+          <div class="modal-score" id="overlay-score">0 điểm</div>
+          <button id="replay-btn" class="btn-primary" type="button">Chơi lại (Enter)</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/game/main.js"></script>
+  </body>
+</html>
