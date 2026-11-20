@@ -205,3 +205,29 @@ test('[P2 regression] dash, fall & respawn, drifter steal/drop, wind charm, and 
   assert.ok(ev3.some((e) => e.name === 'paused'));
   assert.equal(sim.state, 'paused');
 });
+
+test('[P4 fix] falling below island rim cannot snap back up through cliff when moving inward', () => {
+  const sim = new GameSimulation({
+    seed: 1,
+    night: 1,
+    scenario: {
+      player: { pos: [41.0, -2.0, 0], flames: 3 },
+      random_motes: false,
+      random_shades: false,
+      motes: [],
+      shades: []
+    }
+  });
+
+  // Try moving straight back toward island center (-X) while already below the rim
+  let fell = false;
+  for (let i = 0; i < 90; i++) {
+    const evs = sim.step({ move: [-1, 0], cam_yaw_deg: 0 });
+    assert.ok(sim.player.pos[1] < 0, `Player snapped back to Y=${sim.player.pos[1]} at tick ${i}`);
+    if (evs.some((e) => e.name === 'player_hit' && e.data.by === 'fall')) {
+      fell = true;
+      break;
+    }
+  }
+  assert.equal(fell, true, 'Expected player below rim to keep falling and trigger fall hit');
+});

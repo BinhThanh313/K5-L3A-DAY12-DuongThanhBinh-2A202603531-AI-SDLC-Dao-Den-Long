@@ -160,14 +160,14 @@ function getRampHeight(ramps, x, z) {
  */
 export function getSurfaceHeight(map, x, z, currentY = 0, maxStep = 0.65) {
   if (map.night === 1) {
-    return Math.hypot(x, z) <= 40.0 ? 0 : null;
+    return Math.hypot(x, z) <= 40.0 && 0 <= currentY + maxStep ? 0 : null;
   }
 
   if (map.night === 2) {
     const onA = Math.hypot(x, z) <= 28.0;
     const onB = Math.hypot(x - 70, z) <= 28.0;
     const onBridge = x >= 26.0 && x <= 44.0 && z >= -2.0 && z <= 2.0;
-    return onA || onB || onBridge ? 0 : null;
+    return (onA || onB || onBridge) && 0 <= currentY + maxStep ? 0 : null;
   }
 
   // Night 3: 3 tiers + 2 ramps
@@ -203,6 +203,47 @@ export function resolveHorizontalCollision(map, oldX, oldZ, newX, newZ, currentY
   let x = newX;
   let z = newZ;
   let blocked = false;
+
+  // Prevent walking back through the outer cliff wall after falling below the island rim
+  if (currentY < -0.65) {
+    if (map.night === 1) {
+      const r = Math.hypot(x, z);
+      if (r < 40.0) {
+        const nx = r > 1e-6 ? x / r : 1;
+        const nz = r > 1e-6 ? z / r : 0;
+        x = nx * 40.02;
+        z = nz * 40.02;
+        blocked = true;
+      }
+    } else if (map.night === 2) {
+      const rA = Math.hypot(x, z);
+      if (rA < 28.0) {
+        const nx = rA > 1e-6 ? x / rA : 1;
+        const nz = rA > 1e-6 ? z / rA : 0;
+        x = nx * 28.02;
+        z = nz * 28.02;
+        blocked = true;
+      }
+      const rB = Math.hypot(x - 70, z);
+      if (rB < 28.0) {
+        const nx = rB > 1e-6 ? (x - 70) / rB : 1;
+        const nz = rB > 1e-6 ? z / rB : 0;
+        x = 70 + nx * 28.02;
+        z = nz * 28.02;
+        blocked = true;
+      }
+    } else if (map.night === 3) {
+      const r = Math.hypot(x, z);
+      if (r < 45.0) {
+        const nx = r > 1e-6 ? x / r : 1;
+        const nz = r > 1e-6 ? z / r : 0;
+        x = nx * 45.02;
+        z = nz * 45.02;
+        blocked = true;
+      }
+    }
+    return { x, z, blocked };
+  }
 
   if (map.night === 3) {
     // Bell tower cylinder at (0,0), radius 2, Y in [6, 14]
