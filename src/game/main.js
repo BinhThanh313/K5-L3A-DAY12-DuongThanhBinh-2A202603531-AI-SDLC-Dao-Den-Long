@@ -345,17 +345,97 @@ function createMoteVisual() {
 
 function createShadeVisual() {
   const group = new THREE.Group();
+
   const bodyMat = new THREE.MeshStandardMaterial({
     color: PALETTE.shadeBody,
     emissive: PALETTE.shadeRim,
-    emissiveIntensity: 0.75
+    emissiveIntensity: 0.65,
+    roughness: 0.45,
+    metalness: 0.15
   });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 10), bodyMat);
-  body.scale.set(1, 1.35, 1);
-  body.position.y = 0.9;
-  group.add(body);
+  const rimMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.shadeRim,
+    transparent: true,
+    opacity: 0.55
+  });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xe6c8ff });
+
+  // Main floating ink body (tapered shadowy cloak + hooded head)
+  const coreGroup = new THREE.Group();
+  const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.35, 12), bodyMat);
+  cloak.position.y = 0.85;
+  cloak.rotation.x = Math.PI; // Tapered ink tail pointing down
+  cloak.castShadow = true;
+  coreGroup.add(cloak);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 14, 12), bodyMat);
+  head.position.y = 1.45;
+  head.scale.set(1.0, 1.08, 0.95);
+  coreGroup.add(head);
+
+  // Twin curved ink wisps / shadow horns
+  for (const side of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.58, 7), bodyMat);
+    horn.position.set(side * 0.28, 1.92, -0.05);
+    horn.rotation.z = -side * 0.38;
+    horn.rotation.x = -0.25;
+    coreGroup.add(horn);
+  }
+
+  // Glowing menacing eyes facing +Z
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), eyeMat);
+    eye.scale.set(1.3, 0.7, 0.5);
+    eye.position.set(side * 0.19, 1.48, 0.41);
+    eye.rotation.z = side * 0.22;
+    coreGroup.add(eye);
+  }
+
+  // Swirling ink tendrils orbiting base
+  const tendrilsGroup = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    const tendril = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.65, 6), bodyMat);
+    tendril.position.set(Math.cos(angle) * 0.42, 0.52, Math.sin(angle) * 0.42);
+    tendril.rotation.x = Math.PI;
+    tendril.rotation.z = Math.cos(angle) * 0.3;
+    tendrilsGroup.add(tendril);
+  }
+  coreGroup.add(tendrilsGroup);
+
+  // Eerie violet ground ink aura ring
+  const auraRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.45, 0.82, 24),
+    new THREE.MeshBasicMaterial({
+      color: PALETTE.shadeRim,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide
+    })
+  );
+  auraRing.rotation.x = -Math.PI / 2;
+  auraRing.position.y = 0.06;
+  group.add(auraRing);
+
+  // Orbiting ink rim halo
+  const rimRing = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.035, 6, 20), rimMat);
+  rimRing.rotation.x = Math.PI / 2.4;
+  rimRing.position.y = 1.15;
+  coreGroup.add(rimRing);
+
+  // Golden dizzy halo when stunned
+  const stunHalo = new THREE.Mesh(
+    new THREE.TorusGeometry(0.46, 0.055, 8, 20),
+    new THREE.MeshBasicMaterial({ color: PALETTE.gold })
+  );
+  stunHalo.rotation.x = Math.PI / 2;
+  stunHalo.position.y = 2.25;
+  stunHalo.visible = false;
+  group.add(stunHalo);
+
+  group.add(coreGroup);
   scene.add(group);
-  return { group, bodyMat };
+  return { group, coreGroup, tendrilsGroup, bodyMat, eyeMat, auraRing, rimRing, stunHalo };
 }
 
 function createDrifterVisual() {
@@ -700,7 +780,7 @@ function syncVisuals(nowSec) {
     if (!mIds.has(id)) { scene.remove(mesh); moteVisuals.delete(id); }
   }
 
-  // Shades
+  // Shades (detailed state-driven animations)
   const sIds = new Set();
   for (const s of sim.shades) {
     sIds.add(s.id);
@@ -710,7 +790,63 @@ function syncVisuals(nowSec) {
       shadeVisuals.set(s.id, vis);
     }
     vis.group.position.set(s.pos[0], s.pos[1], s.pos[2]);
-    vis.bodyMat.color.setHex(s.state === 'stunned' ? PALETTE.shadeStunned : PALETTE.shadeBody);
+
+    // Face toward Mây
+    const dx = sim.player.pos[0] - s.pos[0];
+    const dz = sim.player.pos[2] - s.pos[2];
+    vis.group.rotation.y = Math.atan2(dx, dz);
+
+    const phase = nowSec * 4 + s.pos[0] * 0.5;
+    vis.coreGroup.position.y = Math.sin(phase) * 0.14;
+    vis.rimRing.rotation.z = nowSec * 2.2;
+
+    if (s.state === 'spawning') {
+      vis.group.scale.setScalar(0.55 + Math.abs(Math.sin(nowSec * 6)) * 0.4);
+      vis.bodyMat.color.setHex(PALETTE.shadeBody);
+      vis.bodyMat.emissiveIntensity = 1.1;
+      vis.eyeMat.color.setHex(0xb88cff);
+      vis.coreGroup.rotation.x = 0;
+      vis.tendrilsGroup.rotation.y = nowSec * 6;
+      vis.stunHalo.visible = false;
+    } else if (s.state === 'stunned') {
+      vis.group.scale.setScalar(1);
+      vis.bodyMat.color.setHex(PALETTE.shadeStunned);
+      vis.bodyMat.emissiveIntensity = 0.25;
+      vis.eyeMat.color.setHex(0x88849e);
+      vis.coreGroup.rotation.x = 0;
+      vis.coreGroup.rotation.z = Math.sin(nowSec * 14) * 0.18;
+      vis.tendrilsGroup.rotation.y = nowSec * 0.8;
+      vis.stunHalo.visible = true;
+      vis.stunHalo.rotation.z = nowSec * 5;
+    } else if (s.state === 'chase') {
+      vis.group.scale.setScalar(1.06);
+      vis.bodyMat.color.setHex(PALETTE.shadeBody);
+      vis.bodyMat.emissiveIntensity = 0.95;
+      vis.eyeMat.color.setHex(0xffffff);
+      vis.coreGroup.rotation.x = 0.22; // Lean forward aggressively
+      vis.coreGroup.rotation.z = 0;
+      vis.tendrilsGroup.rotation.y = nowSec * 4.5;
+      vis.stunHalo.visible = false;
+    } else if (s.state === 'recoil') {
+      vis.group.scale.setScalar(0.95);
+      vis.bodyMat.color.setHex(PALETTE.shadeBody);
+      vis.bodyMat.emissiveIntensity = 0.5;
+      vis.eyeMat.color.setHex(0xd2a8ff);
+      vis.coreGroup.rotation.x = -0.25; // Lean back on recoil
+      vis.coreGroup.rotation.z = 0;
+      vis.tendrilsGroup.rotation.y = nowSec * 2;
+      vis.stunHalo.visible = false;
+    } else {
+      // wander
+      vis.group.scale.setScalar(1);
+      vis.bodyMat.color.setHex(PALETTE.shadeBody);
+      vis.bodyMat.emissiveIntensity = 0.6;
+      vis.eyeMat.color.setHex(0xe6c8ff);
+      vis.coreGroup.rotation.x = 0.06;
+      vis.coreGroup.rotation.z = Math.sin(phase * 0.5) * 0.06;
+      vis.tendrilsGroup.rotation.y = nowSec * 1.8;
+      vis.stunHalo.visible = false;
+    }
   }
   for (const [id, vis] of shadeVisuals) {
     if (!sIds.has(id)) { scene.remove(vis.group); shadeVisuals.delete(id); }
