@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { GameSimulation } from '../sim/engine.js';
 
+const VALID_SHADE_STATES = new Set(['spawning', 'wander', 'chase', 'recoil', 'stunned']);
+
 function fail(code, message) {
   process.stderr.write(`Error: ${message}\n`);
   process.exit(code);
@@ -63,7 +65,9 @@ function parseArgs(argv) {
   }
 
   if (!Number.isInteger(args.seed)) fail(1, 'Required integer --seed');
-  if (!Number.isInteger(args.night) || args.night !== 1) fail(1, 'Required --night 1');
+  if (!Number.isInteger(args.night) || ![1, 2, 3].includes(args.night)) {
+    fail(1, 'Required --night 1, 2, or 3');
+  }
   if (!Number.isInteger(args.ticks) || args.ticks < 0) fail(1, 'Required non-negative integer --ticks');
   if (!args.out) fail(1, 'Required --out <file.jsonl>');
   if (!Number.isInteger(args.snapshotEvery) || args.snapshotEvery <= 0) {
@@ -107,26 +111,22 @@ function validateScenario(data) {
     if (data.player.pos !== undefined && !isVec3(data.player.pos)) {
       fail(2, 'scenario.player.pos must be [x, y, z]');
     }
-    if (
-      data.player.carried !== undefined &&
-      (!Number.isInteger(data.player.carried) || data.player.carried < 0)
-    ) {
-      fail(2, 'scenario.player.carried must be a non-negative integer');
-    }
-    if (
-      data.player.flames !== undefined &&
-      (!Number.isInteger(data.player.flames) || data.player.flames < 0)
-    ) {
-      fail(2, 'scenario.player.flames must be a non-negative integer');
+    for (const intKey of ['carried', 'flames', 'invuln_ticks', 'dash_cd_ticks', 'pulse_cd_ticks', 'charm_ticks']) {
+      if (
+        data.player[intKey] !== undefined &&
+        (!Number.isInteger(data.player[intKey]) || data.player[intKey] < 0)
+      ) {
+        fail(2, `scenario.player.${intKey} must be a non-negative integer`);
+      }
     }
   }
 
-  if (data.random_motes !== undefined && typeof data.random_motes !== 'boolean') {
-    fail(2, 'scenario.random_motes must be boolean');
+  for (const boolKey of ['random_motes', 'random_shades', 'random_drifters', 'wind_enabled']) {
+    if (data[boolKey] !== undefined && typeof data[boolKey] !== 'boolean') {
+      fail(2, `scenario.${boolKey} must be boolean`);
+    }
   }
-  if (data.random_shades !== undefined && typeof data.random_shades !== 'boolean') {
-    fail(2, 'scenario.random_shades must be boolean');
-  }
+
   if (
     data.time_left_s !== undefined &&
     (typeof data.time_left_s !== 'number' || !Number.isFinite(data.time_left_s) || data.time_left_s < 0)
@@ -151,6 +151,30 @@ function validateScenario(data) {
       }
       if (s.id !== undefined && typeof s.id !== 'string') {
         fail(2, 'scenario.shades[].id must be a string');
+      }
+      if (s.state !== undefined && !VALID_SHADE_STATES.has(s.state)) {
+        fail(2, `Invalid shade state "${s.state}"`);
+      }
+      if (s.state_ticks_left !== undefined && (!Number.isInteger(s.state_ticks_left) || s.state_ticks_left < 0)) {
+        fail(2, 'scenario.shades[].state_ticks_left must be a non-negative integer');
+      }
+    }
+  }
+
+  if (data.drifters !== undefined) {
+    if (!Array.isArray(data.drifters)) fail(2, 'scenario.drifters must be an array');
+    for (const d of data.drifters) {
+      if (!d || typeof d !== 'object' || !isVec3(d.pos)) {
+        fail(2, 'Each entry in scenario.drifters must be an object with pos: [x, y, z]');
+      }
+    }
+  }
+
+  if (data.charms !== undefined) {
+    if (!Array.isArray(data.charms)) fail(2, 'scenario.charms must be an array');
+    for (const c of data.charms) {
+      if (!c || typeof c !== 'object' || !isVec3(c.pos)) {
+        fail(2, 'Each entry in scenario.charms must be an object with pos: [x, y, z]');
       }
     }
   }
@@ -210,7 +234,7 @@ function validateInputs(data) {
     if (f.cam_yaw_deg !== undefined && (typeof f.cam_yaw_deg !== 'number' || !Number.isFinite(f.cam_yaw_deg))) {
       fail(2, `inputs.frames[${i}].cam_yaw_deg must be a finite number`);
     }
-    for (const btn of ['jump', 'interact', 'pulse', 'dash']) {
+    for (const btn of ['jump', 'interact', 'pulse', 'dash', 'pause']) {
       if (f[btn] !== undefined && typeof f[btn] !== 'boolean') {
         fail(2, `inputs.frames[${i}].${btn} must be boolean`);
       }
@@ -239,12 +263,14 @@ function main() {
     cam_yaw_deg: 0,
     jump: false,
     interact: false,
-    pulse: false
+    pulse: false,
+    dash: false,
+    pause: false
   };
 
   let frameIdx = 0;
 
-  for (let k = 0; k < args.ticks && sim.state === 'playing'; k++) {
+  for (let k = 0; k < args.ticks && sim.state !== 'won' && sim.state !== 'lost'; k++) {
     while (frameIdx < frames.length && frames[frameIdx].tick === k) {
       const f = frames[frameIdx++];
       if (f.move !== undefined) currentInput.move = [f.move[0], f.move[1]];
@@ -252,6 +278,8 @@ function main() {
       if (f.jump !== undefined) currentInput.jump = f.jump;
       if (f.interact !== undefined) currentInput.interact = f.interact;
       if (f.pulse !== undefined) currentInput.pulse = f.pulse;
+      if (f.dash !== undefined) currentInput.dash = f.dash;
+      if (f.pause !== undefined) currentInput.pause = f.pause;
     }
 
     const events = sim.step(currentInput);
